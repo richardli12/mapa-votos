@@ -5,7 +5,7 @@ import type { MapMode } from '../hooks/useRoute';
 import { diverging, mix, ramp, slotColor, type Palette } from './palette';
 
 export interface LegendItem { color: string; label: string; count?: number; id?: string }
-export interface Legend { kind: 'cat' | 'seq' | 'div'; title: string; note?: string; items: LegendItem[] }
+export interface Legend { kind: 'cat' | 'seq' | 'div'; title: string; note?: string; items: LegendItem[]; ends?: [string, string] }
 export interface Coloring { fill: Map<string, string>; legend: Legend }
 
 export const totalOf = (a: MapArea) => a.valid || Object.values(a.votes).reduce((s, v) => s + v, 0);
@@ -100,9 +100,8 @@ export function colorAreas(payload: MapPayload | null, o: ColorOpts): Coloring {
         const b = binOf(d, edges);
         counts[b]++; fill.set(a.code, colors[b]);
       }
-      const an = titleCase(A.name).split(' ')[0], bn = titleCase(B.name).split(' ')[0];
-      const labels = [`${an} +40`, `${an} +20`, `${an} +7`, 'Empate (±7)', `${bn} +7`, `${bn} +20`, `${bn} +40`];
-      return { fill, legend: { kind: 'div', title: `${titleCase(A.name)} × ${titleCase(B.name)}`, note: 'Vantagem em pontos sobre a soma dos dois', items: colors.map((color, i) => ({ color, label: labels[i], count: counts[i] })) } };
+      const labels = ['+40', '+20', '+7', '±7', '+7', '+20', '+40'];
+      return { fill, legend: { kind: 'div', title: `${titleCase(A.name)} × ${titleCase(B.name)}`, ends: [`← ${titleCase(A.name)}`, `${titleCase(B.name)} →`], note: 'Vantagem em pontos sobre a soma dos dois · faixa do meio (±7) = empate técnico', items: colors.map((color, i) => ({ color, label: labels[i], count: counts[i] })) } };
     }
     case 'margem':
       return seqLegend('Margem do líder', (a) => { const r = ranked(a); const t = totalOf(a); return t && r.length ? ((r[0][1] - (r[1]?.[1] ?? 0)) / t) * 100 : null; }, (x) => `${x.toFixed(0)} p.p.`, 5, 'Diferença entre 1º e 2º colocados — tons claros = disputa acirrada', [3, 8, 15, 25]);

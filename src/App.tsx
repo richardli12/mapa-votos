@@ -61,7 +61,7 @@ export function App() {
 
   useEffect(() => {
     const where = route.mu ? titleCase(munis.get(route.mu)?.name ?? '') : route.uf ? ufName(route.uf) : 'Brasil';
-    document.title = `${cargoInfo(route.cargo).label} · ${where} — ÁGORA 26`;
+    document.title = `${cargoInfo(route.cargo).label} · ${where} — Radar Eleições - Triad3`;
   }, [route.cargo, route.uf, route.mu, munis]);
 
   const state: AppState = { route, go, palette, meta: meta.data, result, map, munis, muniList: munisPoll.data ?? [], cands, t: tq, isDemo, areaName };
@@ -76,7 +76,7 @@ export function App() {
             {meta.data?.warnings.length ? ' A fonte ao vivo (API Brasil Paralelo → TSE) não respondeu agora; ela é testada a cada minuto e assume sozinha quando voltar.' : ' Rode com AGORA_MODE=live para a apuração real.'}
           </div>
         ) : meta.data?.warnings.map((w) => <div key={w} className="banner">{w}</div>)}
-        {meta.error && !meta.data && <div className="banner error">Não foi possível conectar à API do ÁGORA ({meta.error}). Verifique se o servidor está rodando.</div>}
+        {meta.error && !meta.data && <div className="banner error">Não foi possível conectar à API do Radar Eleições ({meta.error}). Verifique se o servidor está rodando.</div>}
         <main className="main">
           <ScopeHeader />
           <CargoTabs />
@@ -86,7 +86,7 @@ export function App() {
           <Body />
         </main>
         <footer className="footer">
-          <div><b>ÁGORA 26</b> · Central de Apuração das Eleições 2026</div>
+          <div><b>Radar Eleições - Triad3</b> · Central de Apuração das Eleições 2026</div>
           <div>Fonte: {meta.data?.sourceLabel ?? '—'}. Dados oficiais de divulgação da Justiça Eleitoral (EA11/EA12/EA14/EA20), com verificação da assinatura digital quando disponível.</div>
           <div className="muted">Mapas: malha municipal do IBGE. Atalhos: <kbd>/</kbd> busca · <kbd>Esc</kbd> fecha a ficha.</div>
         </footer>

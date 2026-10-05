@@ -7,13 +7,21 @@ import { Avatar } from './ui';
 
 export function Logo() {
   return (
-    <a className="logo" href="#/" aria-label="ÁGORA 26 — início">
-      <svg viewBox="0 0 64 64" width="30" height="30" aria-hidden>
-        <defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="var(--brand-a)" /><stop offset="1" stopColor="var(--brand-b)" /></linearGradient></defs>
-        <path d="M32 6 L58 56 H45 L32 30 L19 56 H6 Z" fill="url(#lg)" />
-        <rect x="23" y="44" width="18" height="6" rx="3" fill="currentColor" />
+    <a className="logo" href="#/" aria-label="Radar Eleições - Triad3 — início">
+      <svg viewBox="0 0 64 64" width="34" height="34" aria-hidden>
+        <defs>
+          <linearGradient id="rg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="var(--brand-a)" /><stop offset="1" stopColor="var(--brand-b)" /></linearGradient>
+          <linearGradient id="sw" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stopColor="var(--brand-b)" stopOpacity="0" /><stop offset="1" stopColor="var(--brand-b)" stopOpacity="0.85" /></linearGradient>
+        </defs>
+        <rect x="2" y="2" width="60" height="60" rx="16" fill="url(#rg)" />
+        <g fill="none" stroke="#fff" strokeOpacity="0.55" strokeWidth="2">
+          <circle cx="32" cy="32" r="20" /><circle cx="32" cy="32" r="12" />
+        </g>
+        <path className="sweep" d="M32 32 L32 10 A22 22 0 0 1 52 23 Z" fill="url(#sw)" />
+        <circle cx="32" cy="32" r="3.5" fill="#fff" />
+        <circle cx="43" cy="21" r="3" fill="#fff" />
       </svg>
-      <span className="logo-word">ÁGORA<b>26</b></span>
+      <span className="logo-word"><b>Radar Eleições</b><small>by <i>Triad3</i></small></span>
     </a>
   );
 }
@@ -96,9 +104,9 @@ export function TopBar({ theme, setTheme }: { theme: ThemePref; setTheme: (t: Th
             {!isDemo && verified && <b className="verified" title="Assinatura digital do TSE verificada">✓ assinado</b>}
           </span>
         )}
-        <button className="icon-btn" aria-label="Alternar tema" title="Tema: sistema → claro → escuro"
-          onClick={() => setTheme(theme === 'system' ? 'light' : theme === 'light' ? 'dark' : 'system')}>
-          {theme === 'system' ? '◐' : theme === 'light' ? '☀' : '☾'}
+        <button className="icon-btn" aria-label={theme === 'light' ? 'Usar tema escuro' : 'Usar tema claro'} title={theme === 'light' ? 'Tema escuro' : 'Tema claro'}
+          onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}>
+          {theme === 'light' ? '☾' : '☀'}
         </button>
       </div>
     </header>

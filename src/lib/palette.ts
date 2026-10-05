@@ -21,7 +21,12 @@ export function readPalette(): Palette {
   };
 }
 
-const hex = (h: string) => { const x = h.replace('#', ''); return [0, 2, 4].map((i) => parseInt(x.slice(i, i + 2), 16)); };
+// Aceita #rgb, #rgba, #rrggbb e #rrggbbaa (o minificador de CSS encurta #ffffff para #fff).
+const hex = (h: string) => {
+  let x = h.trim().replace('#', '');
+  if (x.length === 3 || x.length === 4) x = x.slice(0, 3).split('').map((c) => c + c).join('');
+  return [0, 2, 4].map((i) => parseInt(x.slice(i, i + 2), 16) || 0);
+};
 const toHex = (c: number[]) => `#${c.map((x) => Math.round(Math.max(0, Math.min(255, x))).toString(16).padStart(2, '0')).join('')}`;
 const lin = (c: number) => { c /= 255; return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
 const unlin = (c: number) => 255 * (c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055);

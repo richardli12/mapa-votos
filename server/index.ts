@@ -1,4 +1,4 @@
-// Servidor ÁGORA 26 para rodar em máquina própria/container: API (/api/*) + arquivos estáticos do build.
+// Servidor do Radar Eleições - Triad3 para rodar em máquina própria/container: API (/api/*) + arquivos estáticos do build.
 // Na Vercel, a mesma API roda como funções serverless (server/vercel.ts, scripts/build-vercel.mjs).
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
@@ -36,5 +36,5 @@ createServer(async (req, res) => {
     else res.end();
   }
 }).listen(PORT, () => {
-  console.log(`ÁGORA 26 · http://localhost:${PORT} · modo ${MODE}`);
+  console.log(`Radar Eleições - Triad3 · http://localhost:${PORT} · modo ${MODE}`);
 });

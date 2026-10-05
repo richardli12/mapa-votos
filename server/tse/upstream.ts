@@ -93,7 +93,7 @@ export class Upstream {
       if (down && down > Date.now() && i < this.sources.length - 1) continue;
       const src = this.sources[i];
       try {
-        const headers: Record<string, string> = { Accept: 'application/json, application/jose, text/plain, */*', 'User-Agent': 'agora26/1.0' };
+        const headers: Record<string, string> = { Accept: 'application/json, application/jose, text/plain, */*', 'User-Agent': 'radar-eleicoes-triad3/1.0' };
         if (hit && hit.sourceIndex === i) {
           if (hit.etag) headers['If-None-Match'] = hit.etag;
           if (hit.modified) headers['If-Modified-Since'] = hit.modified;

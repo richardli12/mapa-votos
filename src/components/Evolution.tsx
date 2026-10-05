@@ -49,7 +49,8 @@ export function Evolution({ r }: { r: Result }) {
   const [hover, setHover] = useState<number | null>(null);
   const [box, W] = useWidth<HTMLDivElement>();
   const lines = r.candidates.slice(0, 4);
-  const H = W < 560 ? 220 : 260, L = 38, R = W < 560 ? 92 : 132, T = 12, B = 28;
+  const longest = Math.max(...lines.map((c) => titleCase(c.name).length), 6);
+  const H = W < 560 ? 220 : 260, L = 38, R = Math.min(Math.round(W * 0.45), 64 + longest * 7.2), T = 12, B = 28;
   const yMax = useMemo(() => Math.min(100, Math.ceil((Math.max(10, ...pts.flatMap((p) => lines.map((c) => p.v[c.id] ?? 0))) + 4) / 10) * 10), [pts, lines]);
   if (pts.length < 2) {
     return (
@@ -89,7 +90,7 @@ export function Evolution({ r }: { r: Result }) {
           {labelY.map(({ c, v, yy }) => (
             <g key={c.id}>
               <circle cx={x(visible.at(-1)!.p)} cy={y(v)} r={4} fill={slotVar(c.color)} stroke="var(--surface-1)" strokeWidth={2} />
-              <text className="end-label" x={x(visible.at(-1)!.p) + 10} y={yy + 4}>{titleCase(c.name).split(' ')[0]} {fmtPct(v, 1)}</text>
+              <text className="end-label" x={x(visible.at(-1)!.p) + 10} y={yy + 4}>{titleCase(c.name)} {fmtPct(v, 1)}</text>
             </g>
           ))}
           {hp && (

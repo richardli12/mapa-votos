@@ -99,8 +99,8 @@ export function CandidateList({ r, limitDefault = 40 }: { r: Result; limitDefaul
                 <span className="cr-name">
                   <span>{titleCase(c.name)}</span>
                   <small><b style={{ color: 'var(--text-secondary)' }}>{c.party}</b> · {c.number}{c.federation ? ` · ${c.federation}` : c.coalition ? ` · ${c.coalition}` : ''}</small>
+                  <StatusBadge status={c.status} projected={c.projected} size="sm" />{!c.valid && <span className="badge out sm">Anulado</span>}
                 </span>
-                <span className="cr-status"><StatusBadge status={c.status} projected={c.projected} size="sm" />{!c.valid && <span className="badge out sm">Anulado</span>}</span>
                 <span className="cr-bar"><Bar pct={c.pct} max={max} color={slotVar(c.color)} /></span>
                 <span className="cr-votes num">{fmtInt(c.votes)}</span>
                 <span className="cr-pct num">{fmtPct(c.pct)}</span>

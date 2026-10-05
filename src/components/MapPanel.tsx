@@ -88,6 +88,7 @@ export function MapPanel({ compact }: { compact?: boolean }) {
             {loading && <div className="map-loading"><span className="spinner" /> carregando áreas {fmtInt(payload!.total - payload!.pending)}/{fmtInt(payload!.total)}</div>}
             <div className="legend">
               <div className="legend-title">{legend.title}</div>
+              {legend.ends && <div className="legend-ends"><span>{legend.ends[0]}</span><span>{legend.ends[1]}</span></div>}
               <ul className={`legend-items ${legend.kind}`}>
                 {legend.items.slice(0, 9).map((it) => (
                   <li key={it.label} onClick={it.id ? () => go({ cand: it.id, mode: 'forca' }) : undefined} className={it.id ? 'clickable' : ''}>

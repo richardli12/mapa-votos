@@ -1,4 +1,6 @@
-# ÁGORA 26 — Central de Apuração das Eleições 2026
+# Radar Eleições - Triad3
+
+Central de apuração das Eleições 2026.
 
 **O pulso do voto, do Brasil ao município.** Painel de apuração em tempo real para as Eleições Gerais de 2026: Presidente, Governadores, Senado, Câmara dos Deputados e Assembleias Legislativas, por estado e por município, com mapa interativo, fichas de candidatos, comparativos, partidos e análises do perfil do voto.
 
@@ -85,7 +87,7 @@ O servidor tem três modos (`AGORA_MODE`):
 
 A ordem padrão é **API Brasil Paralelo** (`https://apuracao-api.brasilparalelo.com.br`) e, em seguida, o **TSE** (`https://resultados.tse.jus.br`). Para cada arquivo, se a primeira fonte falhar, a segunda assume automaticamente.
 
-O ÁGORA lê os arquivos oficiais de divulgação de 2026 pela mesma árvore de caminhos `/oficial/...`:
+O Radar Eleições lê os arquivos oficiais de divulgação de 2026 pela mesma árvore de caminhos `/oficial/...`:
 
 | Arquivo | Conteúdo |
 |---|---|
@@ -97,7 +99,7 @@ O ÁGORA lê os arquivos oficiais de divulgação de 2026 pela mesma árvore de 
 
 Aceita tanto **JWS assinado** (formato oficial de 2026) quanto **JSON puro**. Nos arquivos JWS, a **assinatura Ed25519 do TSE é verificada** e a interface mostra o selo "✓ assinado". Com `STRICT_SIGNATURE=1`, arquivos do TSE com assinatura inválida são recusados.
 
-> **Sobre a API da Brasil Paralelo:** durante o desenvolvimento o host não estava acessível a partir do ambiente de build, então as rotas dela não puderam ser inspecionadas. O ÁGORA assume que ela espelha a árvore `/oficial/...` da divulgação (o próprio painel descreve que usa os arquivos `ele-c`, EA14 e EA20). Se as rotas forem diferentes, basta ajustar a montagem do caminho em `server/tse/live.ts` (métodos `dir` e `result`) — o resto do sistema não muda. Enquanto isso, o fallback para o TSE garante os dados.
+> **Sobre a API da Brasil Paralelo:** durante o desenvolvimento o host não estava acessível a partir do ambiente de build, então as rotas dela não puderam ser inspecionadas. O Radar Eleições assume que ela espelha a árvore `/oficial/...` da divulgação (o próprio painel descreve que usa os arquivos `ele-c`, EA14 e EA20). Se as rotas forem diferentes, basta ajustar a montagem do caminho em `server/tse/live.ts` (métodos `dir` e `result`) — o resto do sistema não muda. Enquanto isso, o fallback para o TSE garante os dados.
 
 O modo ao vivo foi validado contra arquivos oficiais reais de 04/10/2026 (presidente por UF, governador, senado, deputados, distrital do DF, municípios e EA14), incluindo a verificação das assinaturas.
 
@@ -119,7 +121,7 @@ O modo ao vivo foi validado contra arquivos oficiais reais de 04/10/2026 (presid
 
 Em redes com proxy corporativo, rode com `NODE_USE_ENV_PROXY=1` (Node 22.21+) para que o `fetch` do Node use `HTTPS_PROXY`.
 
-## API do ÁGORA
+## API do Radar Eleições
 
 Todas as respostas são JSON normalizado (o mesmo formato para BP, TSE e simulação):
 

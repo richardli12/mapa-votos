@@ -392,7 +392,7 @@ export class DemoProvider implements Provider {
   // ——— API do provedor ———
   async meta(round: number): Promise<MetaPayload> {
     return {
-      name: 'ÁGORA 26', source: 'demo', sourceLabel: 'Simulação ÁGORA — candidatos e votos fictícios', sourceUrl: '',
+      name: 'Radar Eleições - Triad3', source: 'demo', sourceLabel: 'Simulação Radar Eleições — candidatos e votos fictícios', sourceUrl: '',
       round, rounds: [1], electionDate: '04/10/2026', warnings: [], refreshSeconds: 5,
       cargos: CARGOS.map((c) => ({ id: c.id, label: c.label, levels: c.national ? ['br', 'uf', 'mu'] : ['uf', 'mu'] })),
     };

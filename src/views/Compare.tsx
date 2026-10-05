@@ -92,7 +92,7 @@ export function CompareView() {
             <table className="tbl">
               <thead><tr>
                 <th className={`sortable ${sortBy === 'nome' ? 'on' : ''}`} onClick={() => setSortBy('nome')}>Área</th>
-                {chosen.map((c) => <th key={c.id} className={`r sortable ${sortBy === c.id ? 'on' : ''}`} onClick={() => setSortBy(c.id)}><i className="dot-c" style={{ background: slotVar(c.color) }} /> {titleCase(c.name).split(' ')[0]}</th>)}
+                {chosen.map((c) => <th key={c.id} className={`r sortable cand-col ${sortBy === c.id ? 'on' : ''}`} onClick={() => setSortBy(c.id)}><i className="dot-c" style={{ background: slotVar(c.color) }} /> {titleCase(c.name)}</th>)}
                 <th>Vencedor</th>
                 <th className={`r sortable hide-sm ${sortBy === 'eleitorado' ? 'on' : ''}`} onClick={() => setSortBy('eleitorado')}>Eleitores</th>
               </tr></thead>

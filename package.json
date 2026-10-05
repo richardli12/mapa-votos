@@ -1,8 +1,8 @@
 {
-  "name": "agora26",
+  "name": "radar-eleicoes-triad3",
   "private": true,
   "version": "1.0.0",
-  "description": "ÁGORA 26 — Central de Apuração das Eleições 2026: mapa, candidatos, comparativos e partidos em tempo real.",
+  "description": "Radar Eleições - Triad3 — central de apuração das Eleições 2026: mapa, candidatos, comparativos e partidos em tempo real.",
   "type": "module",
   "scripts": {
     "dev": "concurrently -k -n api,web -c magenta,cyan \"npm:dev:api\" \"npm:dev:web\"",

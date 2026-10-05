@@ -124,7 +124,7 @@ export class LiveProvider implements Provider {
     }
     const s = this.up.sources[0];
     return {
-      name: 'ÁGORA 26', source: s.kind, sourceLabel: this.up.sources.map((x) => x.label).join(' → '), sourceUrl: s.base,
+      name: 'Radar Eleições - Triad3', source: s.kind, sourceLabel: this.up.sources.map((x) => x.label).join(' → '), sourceUrl: s.base,
       round, rounds, electionDate: date, warnings, refreshSeconds: this.refresh,
       cargos: CARGOS.map((c) => ({ id: c.id, label: c.label, levels: c.national ? ['br', 'uf', 'mu'] : ['uf', 'mu'] })),
     };

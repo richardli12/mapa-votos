@@ -1,4 +1,4 @@
-// Roteador da API ÁGORA (/api/*), compartilhado pelo servidor local (server/index.ts)
+// Roteador da API do Radar Eleições (/api/*), compartilhado pelo servidor local (server/index.ts)
 // e pela função serverless da Vercel (server/vercel.ts).
 // Modo de dados: AGORA_MODE=live (BP → TSE) | demo (simulação) | auto (ao vivo, com simulação se a fonte falhar).
 import type { IncomingMessage, ServerResponse } from 'node:http';
