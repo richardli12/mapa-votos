@@ -78,7 +78,8 @@ export function CandidateDrawer() {
               </dl>
             )}
             <div className="drawer-actions">
-              <button className="primary-btn" onClick={() => go({ mode: 'forca', view: 'geral' })}>Mapa de força</button>
+              <button className="primary-btn" onClick={() => go({ mode: 'forca', view: 'geral', fc: route.cand, cand: undefined })}>Mapa de força</button>
+              {route.uf && <button className="ghost-btn" onClick={() => go({ view: 'geral', fc: route.cand, pins: true, cand: undefined })}>📍 Locais de votação</button>}
               <button className="ghost-btn" onClick={() => go({ cmp: route.cmp.includes(route.cand!) ? route.cmp.filter((x) => x !== route.cand) : [...route.cmp, route.cand!].slice(-4) })}>
                 {route.cmp.includes(route.cand) ? '✓ No comparativo' : '+ Comparar'}
               </button>

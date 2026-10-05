@@ -1,15 +1,16 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 
-/** Largura real do elemento — gráficos desenhados em pixels reais, sem esticar texto. */
+/** Largura real do elemento — gráficos desenhados em pixels reais, sem esticar texto.
+ *  Ref por callback: volta a medir quando o elemento é trocado (ex.: estado vazio → gráfico). */
 export function useWidth<T extends HTMLElement>(initial = 640) {
-  const ref = useRef<T>(null);
   const [w, setW] = useState(initial);
-  useEffect(() => {
-    const el = ref.current;
+  const ro = useRef<ResizeObserver | null>(null);
+  const ref = useCallback((el: T | null) => {
+    ro.current?.disconnect();
+    ro.current = null;
     if (!el) return;
-    const ro = new ResizeObserver(([e]) => setW(Math.max(280, Math.round(e.contentRect.width))));
-    ro.observe(el);
-    return () => ro.disconnect();
+    ro.current = new ResizeObserver(([e]) => setW(Math.max(280, Math.round(e.contentRect.width))));
+    ro.current.observe(el);
   }, []);
   return [ref, w] as const;
 }

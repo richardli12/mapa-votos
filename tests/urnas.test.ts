@@ -8,7 +8,7 @@ import { LiveProvider } from '../server/tse/live.ts';
 import { decodeBU } from '../server/urna/bu.ts';
 import { DemoUrnas } from '../server/urna/demo.ts';
 import { escolherUrna, LiveUrnas } from '../server/urna/live.ts';
-import { resumir } from '../server/urna/resumo.ts';
+import { agregarPorLocal, resumir } from '../server/urna/resumo.ts';
 
 const BU = readFileSync(new URL('./fixtures/bu/s02100-0112000080001.bu', import.meta.url));
 
@@ -79,6 +79,34 @@ describe('simulação por urna', () => {
     const tot = (x: typeof cedo) => x.secoes.filter((s) => s.st === 'totalizada').length;
     expect(tot(cedo)).toBeLessThan(tot(tarde));
     expect(tot(tarde)).toBe(tarde.secoes.length);
+  });
+
+  it('locais de votação somam as seções e posicionam o candidato em foco', async () => {
+    const sec = await urnas.secoes('presidente', muni.uf, muni.code, null, [], 1, 1);
+    const r = await demo.result('presidente', { level: 'mu', uf: muni.uf, mu: muni.code }, 1, 1);
+    const foco = r.candidates[2].number;
+    const loc = await urnas.locais('presidente', muni.uf, muni.code, null, [foco], 1, 1);
+    expect(loc.locais.reduce((s, l) => s + l.secoes, 0)).toBe(sec.secoes.length);
+    expect(loc.locais.reduce((s, l) => s + l.nom, 0)).toBe(sec.secoes.reduce((s, x) => s + x.nom, 0));
+    expect(loc.locais.reduce((s, l) => s + (l.v[foco] ?? 0), 0)).toBe(sec.secoes.reduce((s, x) => s + (x.v[foco] ?? 0), 0));
+    for (const l of loc.locais) {
+      const ord = Object.values(l.v).sort((a, b) => b - a);
+      if (l.v[foco]) expect(ord.indexOf(l.v[foco]) + 1).toBeLessThanOrEqual(l.pos!);
+    }
+  });
+});
+
+describe('agregação por local', () => {
+  const s = (z: number, l: number | null, v: Record<string, number>, st: 'totalizada' | 'aguardando' | 'agregada' = 'totalizada') =>
+    ({ z, s: 1, l, st, apt: 10, comp: 8, nom: Object.values(v).reduce((a, b) => a + b, 0), leg: 0, bra: 1, nul: 1, v });
+  it('soma totalizadas, ignora agregadas e conta pendentes', () => {
+    const out = agregarPorLocal([
+      s(1, 5, { 13: 3, 22: 2 }), s(1, 5, { 13: 1, 22: 4 }), s(1, 5, {}, 'aguardando'), s(1, 6, { 22: 5 }), s(1, 6, { 13: 9 }, 'agregada'), s(1, null, { 13: 1 }),
+    ], ['13']);
+    expect(out.map((l) => l.id)).toEqual(['1-5', '1-6']);
+    expect(out[0]).toMatchObject({ secoes: 3, totalizadas: 2, apt: 20, v: { 13: 4, 22: 6 }, pos: 2 });
+    expect(out[1]).toMatchObject({ secoes: 1, v: { 22: 5 } });
+    expect(out[1].pos).toBeUndefined();
   });
 });
 

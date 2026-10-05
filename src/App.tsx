@@ -40,7 +40,7 @@ export function App() {
   const needsUf = route.cargo !== 'presidente' && !route.uf;
   const q = { cargo: route.cargo, uf: route.uf, mu: route.mu, turno: route.turno, t: tq };
   const result = usePoll<Result>(meta.data && !needsUf ? urls.resultado(q) : null, refresh);
-  const focus = [...new Set([route.cand, ...route.cmp].filter((x): x is string => !!x))];
+  const focus = [...new Set([route.fc, route.cand, ...route.cmp].filter((x): x is string => !!x))];
   const big = cargoInfo(route.cargo).proportional && !!route.uf;
   const mapUrl = meta.data ? urls.mapa({ cargo: route.cargo, uf: route.uf, turno: route.turno, t: tq }, big ? focus : [], route.det === 'mu' && !route.uf ? 'mu' : undefined) : null;
   const map = usePoll<MapPayload>(mapUrl, refresh);

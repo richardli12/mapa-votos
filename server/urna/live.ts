@@ -9,7 +9,7 @@ import type { LiveProvider } from '../tse/live.ts';
 import { decodeBU, type BoletimUrna } from './bu.ts';
 import { Progressive } from './progressive.ts';
 import type { UrnasProvider } from './provider.ts';
-import { boletimCompleto, resumir } from './resumo.ts';
+import { agregarPorLocal, boletimCompleto, resumir } from './resumo.ts';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Raw = Record<string, any>;
@@ -110,6 +110,11 @@ export class LiveUrnas implements UrnasProvider {
     });
     const src = this.p.up.sources[0].kind;
     return { cargo, uf, mu, zona, secoes: [...secoes, ...agregadas], pending, total: items.length, source: src };
+  }
+
+  async locais(cargo: CargoId, uf: string, mu: string, zona: number | null, focus: string[], round: number) {
+    const s = await this.secoes(cargo, uf, mu, zona, focus, round);
+    return { cargo, uf, mu, zona, locais: agregarPorLocal(s.secoes, focus), pending: s.pending, total: s.total, source: s.source };
   }
 
   async boletim(uf: string, mu: string, zona: number, secao: number, round: number): Promise<BoletimSecao> {

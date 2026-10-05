@@ -1,17 +1,24 @@
 // Simulação da apuração por urna: zonas eleitorais, locais de votação (nomes FICTÍCIOS) e seções,
 // com boletins completos (todos os cargos) coerentes com os votos simulados do município.
 import type { CargoId } from '../../shared/types.ts';
-import type { BoletimSecao, SecaoResumo, UrnaEstrutura, UrnaLocal, UrnaZona } from '../../shared/urnas.ts';
+import type { BoletimSecao, LocaisPayload, SecaoResumo, UrnaEstrutura, UrnaLocal, UrnaZona } from '../../shared/urnas.ts';
 import type { DemoProvider, DemoUrnaBase, DemoUrnaRace } from '../demo/demo.ts';
 import { FIRST_F, FIRST_M, LAST } from '../demo/names.ts';
 import { field, gauss, hash32, pick, rand } from '../demo/random.ts';
 import type { BoletimUrna, CargoBU, VotoBU } from './bu.ts';
 import type { UrnasProvider } from './provider.ts';
-import { boletimCompleto, resumir } from './resumo.ts';
+import { agregarPorLocal, boletimCompleto, resumir } from './resumo.ts';
 
 const TIPOS = ['Escola Estadual', 'Escola Municipal', 'E.E.', 'EMEF', 'Colégio Estadual', 'Centro Educacional', 'Escola Técnica', 'Instituto Federal', 'Faculdade', 'Ginásio Municipal', 'Centro Comunitário', 'Escola Estadual de Ensino Médio'];
 const BAIRROS = ['Centro', 'Vila Nova', 'Jardim América', 'São José', 'Santa Luzia', 'Boa Vista', 'Bela Vista', 'Jardim Primavera', 'Vila Operária', 'Distrito Industrial', 'Alto da Serra', 'Parque das Árvores', 'Santo Antônio', 'Aparecida', 'Vila Esperança', 'Jardim Europa', 'Morada do Sol', 'Cidade Nova', 'Vila Rica', 'Recanto Verde', 'Planalto', 'São Cristóvão', 'Jardim Paulista', 'Vila Mariana', 'Novo Horizonte', 'Jardim Botânico', 'Liberdade', 'Santa Cruz', 'Bom Jesus', 'Cohab', 'Parque Industrial', 'Vila Maria', 'Jardim Imperial', 'Monte Alegre', 'Santa Rita', 'Portal do Sol'];
 const VIAS = ['Rua', 'Avenida', 'Travessa', 'Alameda', 'Praça'];
+
+/** Ruído determinístico rápido (~normal, desvio ≈ 1) a partir de inteiros — milhões de chamadas sem custo de hash de texto. */
+function ruido(a: number, b: number, c: number, d: number): number {
+  let h = Math.imul(a ^ 0x9e3779b9, 0x85ebca6b) ^ Math.imul(b + 0x632be5ab, 0xc2b2ae35) ^ Math.imul(c + 0x27d4eb2f, 0x165667b1) ^ Math.imul(d + 1, 0x7feb352d);
+  const u = () => { h ^= h >>> 15; h = Math.imul(h, 0x2c1b3c6d); h ^= h >>> 12; h = Math.imul(h, 0x297a2d39); h ^= h >>> 15; return (h >>> 0) / 4294967296; };
+  return (u() + u() + u() - 1.5) * 2;
+}
 
 interface Sec { z: number; s: number; li: number; aptos: number; comp: number; rank: number }
 interface Est { base: DemoUrnaBase; est: UrnaEstrutura; secs: Sec[]; bySec: Map<string, Sec>; bias: number[]; localAptos: number[]; aptosTotal: number }
@@ -121,8 +128,8 @@ export class DemoUrnas implements UrnasProvider {
     const { aff, z } = this.prepare(e, race);
     const b = e.bias[sec.li];
     // variação própria de cada urna (vizinhas no mesmo local não saem idênticas)
-    const ruido = `rn:${e.est.mu}:${sec.z}:${sec.s}:${race.cargo}`;
-    const raw = race.cands.map((_, ci) => (race.final[ci] * sec.aptos * Math.exp(aff[ci] * b + 0.16 * gauss(`${ruido}:${ci}`))) / z[ci]);
+    const mu = Number(e.est.mu), rc = race.code;
+    const raw = race.cands.map((c, ci) => (race.final[ci] * sec.aptos * Math.exp(aff[ci] * b + 0.16 * ruido(mu, sec.z * 10000 + sec.s, rc, c.numero))) / z[ci]);
     const leg = race.legend.map((l) => (l.votos * sec.aptos) / (e.aptosTotal || 1));
     const sum = raw.reduce((a, v) => a + v, 0) + leg.reduce((a, v) => a + v, 0) || 1;
     const totalVotos = sec.comp * race.voteMult;
@@ -164,19 +171,37 @@ export class DemoUrnas implements UrnasProvider {
     return this.build(uf, mu, t).est;
   }
 
+  /** Resumo das seções (da zona ou do município inteiro) para um cargo, sem limite — a simulação é barata. */
+  private resumos(e: Est, cargo: CargoId, uf: string, zona: number | null, focus: string[]): SecaoResumo[] {
+    const race = e.base.races.find((r) => r.cargo === cargo)!;
+    const fset = new Set(focus);
+    return e.secs.filter((s) => zona === null || s.z === zona).map((sec) => {
+      const local = e.est.locais![sec.li].local;
+      if (!this.totalizada(e, sec)) return resumir(null, sec.z, sec.s, cargo, uf, fset, 'aguardando', local);
+      const bu = { local, eleicoes: [{ idEleicao: race.eleicao, aptos: sec.aptos, cargos: [this.cargoBU(e, race, sec)] }] } as unknown as BoletimUrna;
+      return resumir(bu, sec.z, sec.s, cargo, uf, fset);
+    });
+  }
+
   async secoes(cargo: CargoId, uf: string, mu: string, zona: number | null, focus: string[], _round: number, t?: number) {
     const e = this.build(uf, mu, t);
     if (zona === null && !e.est.municipioInteiro) throw new Error(`Este município tem ${e.est.totalSecoes} seções — escolha uma zona eleitoral.`);
-    const race = e.base.races.find((r) => r.cargo === cargo)!;
-    const fset = new Set(focus);
-    const secoes: SecaoResumo[] = e.secs.filter((s) => zona === null || s.z === zona).map((sec) => {
-      const local = e.est.locais![sec.li].local;
-      if (!this.totalizada(e, sec)) return resumir(null, sec.z, sec.s, cargo, uf, fset, 'aguardando', local);
-      const bu: BoletimUrna = { ...this.boletimUrna(e, sec, []), eleicoes: [{ idEleicao: race.eleicao, aptos: sec.aptos, cargos: [this.cargoBU(e, race, sec)] }] };
-      return resumir(bu, sec.z, sec.s, cargo, uf, fset);
-    });
+    const secoes = this.resumos(e, cargo, uf, zona, focus);
     if (zona !== null && !secoes.length) throw new Error('Zona eleitoral não encontrada neste município.');
     return { cargo, uf, mu, zona, secoes, pending: 0, total: secoes.length, source: 'demo' as const };
+  }
+
+  private locaisCache = new Map<string, LocaisPayload>();
+  async locais(cargo: CargoId, uf: string, mu: string, zona: number | null, focus: string[], _round: number, t?: number): Promise<LocaisPayload> {
+    const e = this.build(uf, mu, t);
+    const key = `${mu}:${cargo}:${zona}:${focus.join(',')}:${Math.floor(e.secs.length * e.base.frac)}`;
+    const hit = this.locaisCache.get(key);
+    if (hit) return hit;
+    const secoes = this.resumos(e, cargo, uf, zona, focus);
+    const out: LocaisPayload = { cargo, uf, mu, zona, locais: agregarPorLocal(secoes, focus), pending: 0, total: secoes.length, source: 'demo' };
+    this.locaisCache.set(key, out);
+    if (this.locaisCache.size > 200) this.locaisCache.delete(this.locaisCache.keys().next().value!);
+    return out;
   }
 
   async boletim(uf: string, mu: string, zona: number, secao: number, _round: number, t?: number): Promise<BoletimSecao> {

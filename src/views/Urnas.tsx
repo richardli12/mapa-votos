@@ -3,10 +3,11 @@ import { cargoInfo } from '../../shared/cargos';
 import { fmtInt, fmtPct, normalizeText, titleCase } from '../../shared/format';
 import { ufName } from '../../shared/ufs';
 import type { CandidateLite } from '../../shared/types';
-import type { BoletimSecao, SecaoResumo, SecoesPayload, UrnaEstrutura, UrnaLocal } from '../../shared/urnas';
+import type { BoletimSecao, SecaoResumo, SecoesPayload, UrnaEstrutura } from '../../shared/urnas';
 import { Boletim } from '../components/urnas/Boletim';
 import { SchoolMap, type Ponto } from '../components/urnas/SchoolMap';
 import { Avatar, Bar, Card, downloadCsv, Empty, Seg, slotVar } from '../components/ui';
+import { useLocaisEstaticos } from '../hooks/useLocaisEstaticos';
 import { usePoll } from '../hooks/usePoll';
 import type { UrnaMode } from '../hooks/useRoute';
 import { urls } from '../lib/api';
@@ -15,20 +16,6 @@ import { indiceCandidatos, montarLocais, pad4, ranking, somar, validos, type Loc
 import { useApp } from '../state';
 
 const intensidade = (share: number) => (share < 0.35 ? 0.42 : share < 0.45 ? 0.58 : share < 0.55 ? 0.74 : share < 0.65 ? 0.88 : 1);
-
-/** Locais de votação com nome/endereço gerados no build a partir dos dados abertos do TSE (opcional). */
-function useLocaisEstaticos(uf?: string, mu?: string, ativo = true): UrnaLocal[] | null {
-  const [state, setState] = useState<{ key: string; data: UrnaLocal[] | null }>({ key: '', data: null });
-  const key = `${uf}/${mu}`;
-  useEffect(() => {
-    if (!uf || !mu || !ativo) return;
-    let alive = true;
-    fetch(`/locais/${uf}/${mu}.json`).then((r) => (r.ok && r.headers.get('content-type')?.includes('json') ? r.json() : null)).catch(() => null)
-      .then((d) => { if (alive) setState({ key, data: Array.isArray(d) ? d : null }); });
-    return () => { alive = false; };
-  }, [key, ativo]); // eslint-disable-line react-hooks/exhaustive-deps
-  return state.key === key ? state.data : null;
-}
 
 export function UrnasView() {
   const { route, munis, muniList, go } = useApp();
@@ -58,7 +45,7 @@ function UrnasMunicipio({ uf, mu, nome }: { uf: string; mu: string; nome: string
   const escolaRota = route.esc?.split('-').map(Number);
   const zona = route.z ?? escolaRota?.[0] ?? (e ? (e.municipioInteiro ? null : e.zonas[0]?.zona ?? null) : null);
   const prop = cargoInfo(route.cargo).proportional;
-  const foco = route.cand && prop ? [result.data?.candidates.find((c) => c.id === route.cand)?.number].filter((x): x is string => !!x) : [];
+  const foco = route.fc && prop ? [result.data?.candidates.find((c) => c.id === route.fc)?.number].filter((x): x is string => !!x) : [];
   const sec = usePoll<SecoesPayload>(e ? urls.urnasSecoes(q, zona, foco) : null, refresh);
   useEffect(() => {
     if (!sec.data?.pending) return;
@@ -82,7 +69,7 @@ function UrnasMunicipio({ uf, mu, nome }: { uf: string; mu: string; nome: string
 
   // ——— cores dos pontos ———
   const mode: UrnaMode = route.um ?? 'lider';
-  const forcaNum = (route.cand ? cands.find((c) => c.id === route.cand) : cands[0])?.number;
+  const forcaNum = (route.fc ? cands.find((c) => c.id === route.fc) : cands[0])?.number;
   const forcaCand = forcaNum ? porNumero.get(forcaNum) : undefined;
   const { pontos, legenda } = useMemo(() => {
     const comp = locaisDaZona.map((l) => { const s = somaLocal.get(l.id)!; return s.apt ? s.comp / s.apt : null; }).filter((x): x is number => x !== null).sort((a, b) => a - b);
@@ -151,7 +138,7 @@ function UrnasMunicipio({ uf, mu, nome }: { uf: string; mu: string; nome: string
             actions={<Seg size="sm" label="Cor dos pontos" value={mode} onChange={(m) => go({ um: m })} options={[{ id: 'lider', label: 'Líder' }, { id: 'forca', label: 'Força' }, { id: 'comparecimento', label: 'Comparecimento' }, { id: 'apuracao', label: 'Apuração' }]} />}>
             {mode === 'forca' && cands.length > 0 && (
               <div className="map-pick"><span>Candidato:</span>
-                <select value={forcaCand?.id ?? ''} onChange={(ev) => go({ cand: ev.target.value })} aria-label="Candidato do mapa de força">
+                <select value={forcaCand?.id ?? ''} onChange={(ev) => go({ fc: ev.target.value })} aria-label="Candidato do mapa de força">
                   {cands.slice(0, 300).map((c) => <option key={c.id} value={c.id}>{titleCase(c.name)} ({c.party} {c.number})</option>)}
                 </select>
               </div>

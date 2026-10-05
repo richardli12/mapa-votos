@@ -2,7 +2,7 @@
 // no resumo por cargo usado pelo mapa/tabelas e no boletim completo exibido na tela.
 import { cargoCode, cargoFromCode, cargoLabel } from '../../shared/cargos.ts';
 import type { CargoId, Result, SourceKind } from '../../shared/types.ts';
-import type { BoletimCargo, BoletimSecao, SecaoResumo, SecaoStatus } from '../../shared/urnas.ts';
+import type { BoletimCargo, BoletimSecao, LocalResumo, SecaoResumo, SecaoStatus } from '../../shared/urnas.ts';
 import type { BoletimUrna, CargoBU } from './bu.ts';
 
 export interface CargoNaUrna { cargo: CargoBU; aptos: number }
@@ -102,4 +102,29 @@ export function boletimCompleto(bu: BoletimUrna, uf: string, mu: string, z: numb
     urna: { tipo: bu.tipoUrna, versao: bu.versao, numeroInterno: bu.numeroInterno, codigoCarga: bu.codigoCarga, serieFlash: bu.serieFlash },
     biometria: bu.biometria, liberadosCodigo: bu.liberadosCodigo, apuracaoSA: bu.apuracaoSA, ...extra, cargos, source,
   };
+}
+
+/** Soma as seções por local de votação (zona + número do local). */
+export function agregarPorLocal(secoes: SecaoResumo[], focus: string[]): LocalResumo[] {
+  const m = new Map<string, LocalResumo & { todos: Record<string, number> }>();
+  for (const s of secoes) {
+    if (s.l === null || s.st === 'agregada') continue;
+    const id = `${s.z}-${s.l}`;
+    let l = m.get(id);
+    if (!l) { l = { id, zona: s.z, local: s.l, secoes: 0, totalizadas: 0, apt: 0, comp: 0, nom: 0, leg: 0, bra: 0, nul: 0, v: {}, todos: {} }; m.set(id, l); }
+    l.secoes++;
+    if (s.st !== 'totalizada') continue;
+    l.totalizadas++;
+    l.apt += s.apt; l.comp += s.comp; l.nom += s.nom; l.leg += s.leg; l.bra += s.bra; l.nul += s.nul;
+    for (const k in s.v) l.todos[k] = (l.todos[k] ?? 0) + s.v[k];
+  }
+  return [...m.values()].map(({ todos, ...l }) => {
+    const ord = Object.entries(todos).sort((a, b) => b[1] - a[1]);
+    const keep = new Set(ord.slice(0, 6).map(([k]) => k));
+    for (const f of focus) if (todos[f] !== undefined) keep.add(f);
+    const out: LocalResumo = { ...l, v: Object.fromEntries(ord.filter(([k]) => keep.has(k))) };
+    const f = focus[0];
+    if (f && todos[f]) out.pos = ord.findIndex(([k]) => k === f) + 1;
+    return out;
+  }).sort((a, b) => a.zona - b.zona || a.local - b.local);
 }

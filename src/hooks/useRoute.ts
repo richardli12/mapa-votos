@@ -13,8 +13,12 @@ export interface Route {
   mode?: MapMode;
   /** candidatos selecionados para comparar (ids) */
   cmp: string[];
-  /** candidato em destaque (mapa de força / ficha) */
+  /** candidato com a ficha aberta */
   cand?: string;
+  /** candidato em foco no mapa (força e locais de votação) */
+  fc?: string;
+  /** pins dos locais de votação ligados */
+  pins?: boolean;
   turno: number;
   /** Brasil por município */
   det?: 'mu';
@@ -40,6 +44,8 @@ export function parseHash(hash: string): Route {
     mode: (p.get('m') as MapMode) || undefined,
     cmp: (p.get('cmp') ?? '').split(',').filter(Boolean).slice(0, 4),
     cand: p.get('cand') || undefined,
+    fc: /^\d+$/.test(p.get('fc') ?? '') ? p.get('fc')! : undefined,
+    pins: p.get('pins') === '1' || undefined,
     turno: p.get('turno') === '2' ? 2 : 1,
     det: p.get('det') === 'mu' ? 'mu' : undefined,
     z: int(p.get('z')),
@@ -58,6 +64,8 @@ export function toHash(r: Route): string {
   if (r.mode) p.set('m', r.mode);
   if (r.cmp.length) p.set('cmp', r.cmp.join(','));
   if (r.cand) p.set('cand', r.cand);
+  if (r.fc) p.set('fc', r.fc);
+  if (r.pins) p.set('pins', '1');
   if (r.turno !== 1) p.set('turno', '2');
   if (r.det && !r.uf) p.set('det', r.det);
   if (r.mu && r.z) p.set('z', String(r.z));

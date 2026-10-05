@@ -117,3 +117,33 @@ export interface BoletimSecao {
   cargos: BoletimCargo[];
   source: SourceKind;
 }
+
+/** Soma de um local de votação (escola) para um cargo — base dos pins no mapa. */
+export interface LocalResumo {
+  id: string; // `${zona}-${local}`
+  zona: number;
+  local: number;
+  secoes: number;
+  totalizadas: number;
+  apt: number;
+  comp: number;
+  nom: number;
+  leg: number;
+  bra: number;
+  nul: number;
+  /** votos por número: os 6 mais votados no local + o candidato em foco (exato) */
+  v: Record<string, number>;
+  /** posição do candidato em foco no local (1 = venceu), quando há votos */
+  pos?: number;
+}
+
+export interface LocaisPayload {
+  cargo: import('./types').CargoId;
+  uf: string;
+  mu: string;
+  zona: number | null;
+  locais: LocalResumo[];
+  pending: number;
+  total: number;
+  source: import('./types').SourceKind;
+}

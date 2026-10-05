@@ -15,6 +15,7 @@ export const urls = {
   progresso: (q: Partial<Query>) => `/api/progresso?${qs(common(q))}`,
   urnasEstrutura: (q: Query) => `/api/urnas/estrutura?${qs({ uf: q.uf, mu: q.mu, ...common(q) })}`,
   urnasSecoes: (q: Query, zona: number | null, foco: string[]) => `/api/urnas/secoes?${qs({ cargo: q.cargo, uf: q.uf, mu: q.mu, zona: zona ?? undefined, foco: foco.join(',') || undefined, ...common(q) })}`,
+  urnasLocais: (q: Query, zona: number | null, foco: string[]) => `/api/urnas/locais?${qs({ cargo: q.cargo, uf: q.uf, mu: q.mu, zona: zona ?? undefined, foco: foco.join(',') || undefined, ...common(q) })}`,
   urnasBoletim: (q: Query, zona: number, secao: number) => `/api/urnas/boletim?${qs({ uf: q.uf, mu: q.mu, zona, secao, ...common(q) })}`,
 };
 

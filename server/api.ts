@@ -157,6 +157,17 @@ async function route(req: IncomingMessage, res: ServerResponse, u: URL) {
       const out = await urnas(p).secoes(parseCargo(u.searchParams.get('cargo')), uf, mu, zona, focus, round, t);
       return send(req, res, 200, out, out.pending ? 2 : fresh);
     }
+    case '/api/urnas/locais': {
+      const { uf, mu } = parseMunicipio(u);
+      const focus = (u.searchParams.get('foco') ?? '').split(',').filter((x) => /^\d{1,5}$/.test(x)).slice(0, 4);
+      const zona = parseNum(u, 'zona', false);
+      if (zona === null && !isDemo) {
+        const est = await urnas(p).estrutura(uf, mu, round, t);
+        if (!est.municipioInteiro) throw new HttpError(400, `Este município tem ${est.totalSecoes} seções — escolha uma zona eleitoral.`);
+      }
+      const out = await urnas(p).locais(parseCargo(u.searchParams.get('cargo')), uf, mu, zona, focus, round, t);
+      return send(req, res, 200, out, out.pending ? 2 : fresh);
+    }
     case '/api/urnas/boletim': {
       const { uf, mu } = parseMunicipio(u);
       const b = await urnas(p).boletim(uf, mu, parseNum(u, 'zona', true)!, parseNum(u, 'secao', true)!, round, t);
@@ -183,4 +194,4 @@ async function route(req: IncomingMessage, res: ServerResponse, u: URL) {
 }
 
 /** Rotas expostas — o build da Vercel cria uma função para cada uma. */
-export const API_ROUTES = ['meta', 'municipios', 'resultado', 'mapa', 'progresso', 'foto', 'saude', 'urnas/estrutura', 'urnas/secoes', 'urnas/boletim'];
+export const API_ROUTES = ['meta', 'municipios', 'resultado', 'mapa', 'progresso', 'foto', 'saude', 'urnas/estrutura', 'urnas/secoes', 'urnas/locais', 'urnas/boletim'];

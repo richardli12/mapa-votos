@@ -35,6 +35,7 @@ Central de apuração das Eleições 2026.
   - **mapa das escolas** do município: cada local de votação é um ponto do tamanho do seu eleitorado, colorido pelo líder, pela força de um candidato, pelo comparecimento ou pelo andamento da apuração;
   - resumo de cada zona e escola (aptos, comparecimento, brancos, nulos, votos por candidato e por partido) e tabela de seções ordenável com CSV;
   - **boletim de urna digital** de cada seção, com todos os cargos, horários de abertura e encerramento, número da urna, código de carga e hash do arquivo — lido do arquivo oficial `.bu` (ASN.1) publicado pelo TSE.
+- **📍 Locais de votação no mapa** — escolha o candidato e ligue o interruptor: cada escola vira um **pin** no mapa do município (que cai em cascata a partir do centro), colorido pela força do candidato naquele local, com tamanho pelo eleitorado e **★** onde ele venceu. Filtros *Todos / Onde vence / Onde perde*, ficha do local (votos, posição, quem venceu ali, atalho para as seções e boletins), ranking dos locais onde vai melhor e pior, e link compartilhável (`fc=<candidato>&pins=1`). A ficha do candidato também tem o atalho **Locais de votação**. Em cidades grandes, no modo ao vivo, os pins são carregados por zona eleitoral.
 - **Evolução da apuração**: curva das porcentagens conforme as urnas são totalizadas, com as **viradas** marcadas.
 - Tema claro/escuro, responsivo (celular), atalhos de teclado (`/` busca, `Esc` fecha a ficha), paleta validada para daltonismo.
 
@@ -161,6 +162,7 @@ Todas as respostas são JSON normalizado (o mesmo formato para BP, TSE e simula�
 | `GET /api/foto` | `p` | foto do candidato (proxy com cache) |
 | `GET /api/urnas/estrutura` | `uf`, `mu` | zonas, seções e (na simulação) locais de votação |
 | `GET /api/urnas/secoes` | `cargo`, `uf`, `mu`, `zona?`, `foco?` | resumo de cada seção para o cargo |
+| `GET /api/urnas/locais` | `cargo`, `uf`, `mu`, `zona?`, `foco?` | seções somadas por local de votação (pins do mapa), com a posição do candidato em foco |
 | `GET /api/urnas/boletim` | `uf`, `mu`, `zona`, `secao` | boletim de urna completo da seção (todos os cargos) |
 
 `cargo` ∈ `presidente`, `governador`, `senador`, `depfederal`, `depestadual`. `mu` é o código TSE de 5 dígitos. Na simulação, `t` (0–1) posiciona a máquina do tempo.
