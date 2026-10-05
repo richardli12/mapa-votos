@@ -85,11 +85,6 @@ export function App() {
           {result.error && !needsUf && <div className="banner error">{result.error}</div>}
           <Body />
         </main>
-        <footer className="footer">
-          <div><b>Radar Eleições - Triad3</b> · Central de Apuração das Eleições 2026</div>
-          <div>Fonte: {meta.data?.sourceLabel ?? '—'}. Dados oficiais de divulgação da Justiça Eleitoral (EA11/EA12/EA14/EA20), com verificação da assinatura digital quando disponível.</div>
-          <div className="muted">Mapas: malha municipal do IBGE. Atalhos: <kbd>/</kbd> busca · <kbd>Esc</kbd> fecha a ficha.</div>
-        </footer>
         <CandidateDrawer />
         {isDemo && <TimeMachine t={t} setT={setT} playing={playing} setPlaying={setPlaying} />}
       </div>

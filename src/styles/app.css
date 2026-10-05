@@ -397,7 +397,6 @@ kbd { font-family: var(--font); font-size: 11px; padding: 1px 6px; border: 1px s
 .tm-live.on { color: var(--text-primary); border-color: var(--line-strong); }
 .tm-live.on .dot { background: var(--live); animation: ping 1.8s infinite; }
 
-.footer { max-width: 1480px; width: 100%; margin: 0 auto; padding: 24px 24px 32px; color: var(--text-secondary); font-size: 12.5px; display: flex; flex-direction: column; gap: 4px; border-top: 1px solid var(--line); }
 
 /* ——— Responsivo ——— */
 @media (max-width: 1100px) {
@@ -427,8 +426,7 @@ kbd { font-family: var(--font); font-size: 11px; padding: 1px 6px; border: 1px s
   .comp-list { grid-template-columns: 1fr; }
   .map-card .legend { position: static; max-width: none; margin-top: 8px; box-shadow: none; }
   .map-svg { max-height: 62vh; }
-  .footer { padding: 20px 16px 28px; }
-  .tm-top span { display: none; }
+    .tm-top span { display: none; }
   .cmp-bar { bottom: 86px; }
 }
 @media (prefers-reduced-motion: reduce) {
