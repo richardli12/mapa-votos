@@ -70,7 +70,20 @@ async function api(req: IncomingMessage, res: ServerResponse, u: URL) {
     case '/api/resultado': return send(req, res, 200, await p.result(parseCargo(u.searchParams.get('cargo')), parseScope(u), round, t));
     case '/api/mapa': {
       const focus = (u.searchParams.get('foco') ?? '').split(',').filter((x) => /^\d+$/.test(x)).slice(0, 8);
-      return send(req, res, 200, await p.map(parseCargo(u.searchParams.get('cargo')), parseScope(u), focus, round, t));
+      const cargo = parseCargo(u.searchParams.get('cargo'));
+      const scope = parseScope(u);
+      if (scope.level === 'br' && u.searchParams.get('detalhe') === 'mu') {
+        // Brasil inteiro por município: junta os mapas das 27 UFs.
+        const parts = await Promise.all(UFS.map((x) => p.map(cargo, { level: 'uf', uf: x.uf }, focus, round, t)));
+        const head = cargo === 'presidente' ? await p.map(cargo, { level: 'br' }, focus, round, t) : null;
+        const cands = new Map((head?.candidates ?? parts.flatMap((m) => m.candidates)).map((c) => [c.id, c]));
+        return send(req, res, 200, {
+          cargo, parent: { level: 'br' }, areas: parts.flatMap((m) => m.areas), candidates: [...cands.values()],
+          pending: parts.reduce((s, m) => s + m.pending, 0), total: parts.reduce((s, m) => s + m.total, 0),
+          updatedAt: head?.updatedAt ?? parts[0]?.updatedAt ?? null, source: parts[0]?.source ?? 'demo',
+        });
+      }
+      return send(req, res, 200, await p.map(cargo, scope, focus, round, t));
     }
     case '/api/progresso': return send(req, res, 200, await p.progress(round, t));
     case '/api/foto': {

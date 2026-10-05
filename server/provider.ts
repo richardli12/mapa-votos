@@ -26,6 +26,14 @@ export function areaFromResult(code: string, r: Result, focus: string[]): MapAre
   };
   if (r.candidates.length > 30 || r.seats > 2) {
     area.partyVotes = Object.fromEntries(r.parties.map((p) => [p.party, p.votes]));
+    const seats = r.parties.filter((p) => p.seats);
+    if (seats.length) area.partySeats = Object.fromEntries(seats.map((p) => [p.party, p.seats!]));
+  }
+  const withStatus = r.candidates.filter((c) => c.status);
+  if (withStatus.length && withStatus.length <= 40) area.statuses = Object.fromEntries(withStatus.filter((c) => c.status !== 'Não eleito' && c.status !== 'Suplente').map((c) => [c.id, c.status]));
+  if (r.seats <= 2) {
+    const winners = r.candidates.filter((c) => c.elected || c.projected).map((c) => c.id);
+    if (winners.length) area.winners = winners;
   }
   return area;
 }

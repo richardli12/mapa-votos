@@ -17,7 +17,7 @@ interface RoundCtx { round: number; pleito: string; date: string; elections: Raw
 interface Ctx { cycle: string; dirs: Record<string, string>; rounds: RoundCtx[]; munis: Municipality[]; munByCode: Map<string, Municipality> }
 
 interface Stored { area: MapArea; top: Result['candidates']; many: boolean; updatedAt: string | null; source: SourceKind }
-interface Loader { items: string[]; done: Map<string, Stored>; running: boolean; startedAt: number; touched: number }
+interface Loader { items: string[]; done: Map<string, Stored>; tried: Set<string>; running: boolean; startedAt: number; touched: number }
 
 export class LiveProvider implements Provider {
   readonly up: Upstream;
@@ -66,10 +66,11 @@ export class LiveProvider implements Provider {
     const ctx: Ctx = { cycle: this.cycle, dirs, rounds, munis: [], munByCode: new Map() };
     // Lista oficial de municípios (EA12) da eleição estadual do 1º turno.
     const first = rounds[0];
-    const stateEle = first && this.electionFor(first, 'governador', 'sp');
+    const stateEle = first && this.electionFor(first, 'governador');
     if (stateEle) {
       try {
-        const cm = (await this.getAny([`${this.dir(ctx, 'cm', stateEle, 'br', first.pleito)}/mun-e${pad(stateEle, 6)}-cm.jws`], 3_600_000)).value as Raw;
+        const cmBase = `${this.dir(ctx, 'cm', stateEle, 'br', first.pleito)}/mun-e${pad(stateEle, 6)}-cm`;
+        const cm = (await this.getAny([`${cmBase}.jws`, `${cmBase}.json`], 3_600_000)).value as Raw;
         for (const a of cm.abr ?? []) {
           for (const m of a.mu ?? []) {
             const code = pad(m.cd, 5), known = MUN_BY_CODE.get(code);
@@ -153,7 +154,7 @@ export class LiveProvider implements Provider {
   /** Carregamento progressivo das áreas do mapa (municípios chegam aos poucos, respeitando limites da fonte). */
   private loader(key: string, items: string[], fetchOne: (code: string) => Promise<Result>): Loader {
     let l = this.loaders.get(key);
-    if (!l) { l = { items, done: new Map(), running: false, startedAt: 0, touched: Date.now() }; this.loaders.set(key, l); }
+    if (!l) { l = { items, done: new Map(), tried: new Set(), running: false, startedAt: 0, touched: Date.now() }; this.loaders.set(key, l); }
     l.touched = Date.now();
     const stale = Date.now() - l.startedAt > this.refresh * 1000;
     if (!l.running && stale) {
@@ -170,7 +171,8 @@ export class LiveProvider implements Provider {
               const area = areaFromResult(code, r, []);
               area.votes = Object.fromEntries(r.candidates.filter((c) => c.votes > 0).map((c) => [c.id, c.votes]));
               loader.done.set(code, { area, top: r.candidates.slice(0, 6), many: r.candidates.length > 30, updatedAt: r.updatedAt, source: r.source });
-            } catch { /* mantém o anterior */ }
+            } catch { /* mantém o anterior; arquivo ainda não publicado pela fonte */ }
+            loader.tried.add(code);
           }
         };
         await Promise.all(Array.from({ length: 6 }, worker));
@@ -211,7 +213,8 @@ export class LiveProvider implements Provider {
     if (header) header.candidates.forEach(addCand);
     const updated = [...l.done.values()].map((s) => s.updatedAt).filter(Boolean).sort().at(-1) ?? header?.updatedAt ?? null;
     const src = [...l.done.values()][0]?.source ?? header?.source ?? this.up.sources[0].kind;
-    return { cargo, parent, areas, candidates: [...cands.values()], pending: items.length - l.done.size, total: items.length, updatedAt: updated, source: src };
+    // pendentes = ainda não consultados nesta carga (falhas contam como consultadas, para não girar para sempre)
+    return { cargo, parent, areas, candidates: [...cands.values()], pending: items.filter((c) => !l.tried.has(c)).length, total: items.length, updatedAt: updated, source: src };
   }
 
   async progress(round: number): Promise<ProgressRow[]> {

@@ -24,14 +24,11 @@ export function assignColors<T>(items: T[], party: (t: T) => string, key: (t: T)
   const order = [...items].sort((a, b) => rank(party(a)) - rank(party(b)) || key(a).localeCompare(key(b)));
   const used = new Set<number>();
   const out = new Map<string, number>();
-  const leftovers: T[] = [];
+  // Em ordem de peso histórico: cor preferida se livre; senão a primeira livre; acabou a paleta → "outros".
   for (const it of order) {
-    const pref = (PREFERRED[party(it)] ?? []).find((s) => !used.has(s));
-    if (pref !== undefined && used.size < max) { used.add(pref); out.set(key(it), pref); } else leftovers.push(it);
-  }
-  for (const it of leftovers) {
-    let slot = -1;
-    for (let s = 0; s < SLOT_COUNT && used.size < max; s++) if (!used.has(s)) { slot = s; break; }
+    let slot = (PREFERRED[party(it)] ?? []).find((s) => !used.has(s)) ?? -1;
+    if (slot < 0) for (let s = 0; s < SLOT_COUNT; s++) if (!used.has(s)) { slot = s; break; }
+    if (used.size >= max) slot = -1;
     if (slot >= 0) used.add(slot);
     out.set(key(it), slot);
   }

@@ -111,6 +111,12 @@ export interface MapArea {
   votes: Record<string, number>;
   /** votos por partido (proporcionais) */
   partyVotes?: Record<string, number>;
+  /** cadeiras (eleitas ou projetadas) por partido — só no nível UF de proporcionais */
+  partySeats?: Record<string, number>;
+  /** situação oficial dos candidatos que têm alguma (eleito, 2º turno…) */
+  statuses?: Record<string, string>;
+  /** candidatos eleitos ou projetados */
+  winners?: string[];
   status: CountStatus;
 }
 

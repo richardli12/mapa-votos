@@ -108,13 +108,12 @@ export function normalizeResult(raw: Raw, opt: NormalizeOptions): Result {
   }
 
   candidates.sort((a, b) => b.votes - a.votes || a.name.localeCompare(b.name));
-  const colors = assignColors(candidates, (c) => c.party, (c) => c.id);
-  for (const c of candidates) c.color = colors.get(c.id) ?? -1;
-
   const partyList = [...parties.values()];
+  // A cor do candidato é a cor do partido (estável durante toda a apuração).
+  const partyColors = assignColors(partyList, (p) => p.party, (p) => p.party);
+  for (const c of candidates) c.color = partyColors.get(c.party) ?? -1;
   for (const p of partyList) p.votes += p.legend;
   const partyTotal = partyList.reduce((s, p) => s + p.votes, 0) || 1;
-  const partyColors = assignColors(partyList, (p) => p.party, (p) => p.party);
   for (const p of partyList) {
     p.pct = (p.votes / partyTotal) * 100;
     p.color = partyColors.get(p.party) ?? -1;

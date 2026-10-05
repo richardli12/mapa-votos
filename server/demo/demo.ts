@@ -146,17 +146,17 @@ export class DemoProvider implements Provider {
   private finishRace(base: Omit<Race, 'colors' | 'partyColors' | 'muniIndex' | 'eps'>): Race {
     const eps = new Float32Array(base.final.length);
     for (let i = 0; i < eps.length; i++) eps[i] = 0.09 * gauss(`${base.key}:e${i}`);
+    const partyColors = assignColors(base.parties, (p) => p, (p) => p);
     return {
       ...base, eps, muniIndex: new Map(base.munis.map((m, i) => [m.m.code, i])),
-      colors: assignColors(base.cands, (c) => c.party, (c) => c.id),
-      partyColors: assignColors(base.parties.map((p) => ({ p })), (x) => x.p, (x) => x.p),
+      colors: new Map(base.cands.map((c) => [c.id, partyColors.get(c.party) ?? -1])), partyColors,
     };
   }
 
   private buildPresident(): Race {
     const profiles: { party: string; base: number; reg: Partial<Record<Region, number>>; urban: number; amp: number; homeUf?: string }[] = [
-      { party: 'PT', base: 0.0, reg: { Norte: 0.25, Nordeste: 1.05, 'Centro-Oeste': -0.45, Sudeste: -0.05, Sul: -0.45 }, urban: -0.05, amp: 0.3 },
-      { party: 'PL', base: 0.07, reg: { Norte: 0.3, Nordeste: -0.75, 'Centro-Oeste': 0.6, Sudeste: 0.18, Sul: 0.55 }, urban: -0.1, amp: 0.3 },
+      { party: 'PT', base: 0.0, reg: { Norte: 0.2, Nordeste: 0.78, 'Centro-Oeste': -0.35, Sudeste: 0.0, Sul: -0.35 }, urban: -0.05, amp: 0.3 },
+      { party: 'PL', base: 0.07, reg: { Norte: 0.28, Nordeste: -0.5, 'Centro-Oeste': 0.5, Sudeste: 0.12, Sul: 0.45 }, urban: -0.1, amp: 0.3 },
       { party: 'PSD', base: -1.75, reg: { Sudeste: 0.15, 'Centro-Oeste': 0.2 }, urban: 0.15, amp: 0.4, homeUf: 'go' },
       { party: 'NOVO', base: -2.7, reg: { Sul: 0.35, Sudeste: 0.3, Nordeste: -0.5 }, urban: 0.7, amp: 0.3, homeUf: 'mg' },
       { party: 'PSOL', base: -3.0, reg: { Sudeste: 0.2 }, urban: 0.9, amp: 0.25 },
@@ -225,8 +225,8 @@ export class DemoProvider implements Provider {
     const region = ufInfo(uf)!.region;
     const seats = cargo === 'depfederal' ? FED_SEATS[uf] : stateSeats(uf);
     const total = Math.min(seats * 2 + (cargo === 'depfederal' ? 18 : 22), cargo === 'depfederal' ? 150 : 170);
-    const strength = PARTIES.map((p) => p.strength + (p.region?.[region] ?? 0) + 0.35 * gauss(`${cargo}:${uf}:ps:${p.sg}`));
-    const share = softmax(strength.map((s) => s * 1.6));
+    const strength = PARTIES.map((p) => p.strength + (p.region?.[region] ?? 0) + 0.2 * gauss(`${cargo}:${uf}:ps:${p.sg}`));
+    const share = softmax(strength.map((s) => s * 1.4));
     const parties = PARTIES.map((p) => p.sg);
     const perParty = share.map((s) => Math.max(1, Math.round(s * total)));
     const cands: DemoCand[] = [];
@@ -252,7 +252,7 @@ export class DemoProvider implements Provider {
     const legendRate = parties.map((p) => 0.025 + 0.07 * rand(`${cargo}:${uf}:lg:${p}`) + (p === 'PT' || p === 'PSOL' || p === 'NOVO' ? 0.05 : 0));
     munis.forEach((ms, mi) => {
       const valid = ms.electorate * ms.turnout * (1 - ms.blank * 1.9 - ms.nul * 1.3);
-      const ps = softmax(strength.map((s, pi) => s * 1.6 + 0.45 * field(`${cargo}:${uf}:pf:${parties[pi]}`, ms.lon, ms.lat, 3) + 0.15 * gauss(`${cargo}:${ms.m.code}:${pi}`)));
+      const ps = softmax(strength.map((s, pi) => s * 1.4 + 0.5 * field(`${cargo}:${uf}:pf:${parties[pi]}`, ms.lon, ms.lat, 3) + 0.15 * gauss(`${cargo}:${ms.m.code}:${pi}`)));
       const weights = cands.map((_, ci) => pulls[ci] * (0.12 + 4 * Math.exp(-distKm(ms, homes[ci].lon, homes[ci].lat) / 70)));
       const byParty = new Float64Array(np);
       weights.forEach((w, ci) => { byParty[partyOfArr[ci]] += w; });
@@ -357,7 +357,7 @@ export class DemoProvider implements Provider {
       const co = race.coalition.get(c.id);
       return {
         id: c.id, number: c.number, name: c.name, fullName: c.fullName, party: c.party, partyName: part?.name ?? c.party,
-        federation: part?.fed ? FED_LABEL[part.fed] : undefined, coalition: co?.name ?? (part?.fed ? `Federação ${part.fed.charAt(0)}${part.fed.slice(1).toLowerCase()}` : undefined), coalitionParties: co?.parties,
+        federation: part?.fed ? FED_LABEL[part.fed] : undefined, coalition: co?.name ?? (part?.fed ? `Federação ${part.fed}` : undefined), coalitionParties: co?.parties,
         votes: agg.votes[ci], pct: valid ? (agg.votes[ci] / valid) * 100 : 0, elected: st?.elected ?? false, projected: st?.projected || undefined,
         status: st?.status ?? '', valid: true, runningMates: c.mates, birth: c.birth, photo: null, color: race.colors.get(c.id) ?? -1,
       };
