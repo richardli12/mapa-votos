@@ -1,8 +1,8 @@
-import { Fragment, useEffect, useMemo } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { fmtInt, fmtPct, titleCase } from '../../shared/format';
 import { totalOf } from '../lib/mapcolor';
 import { useApp } from '../state';
-import { Avatar, Bar, slotVar, StatusBadge } from './ui';
+import { Avatar, Bar, downloadCsv, Seg, slotVar, StatusBadge } from './ui';
 
 function age(birth?: string) {
   if (!birth || !/^\d{2}\/\d{2}\/\d{4}$/.test(birth)) return null;
@@ -26,18 +26,18 @@ export function CandidateDrawer() {
     return () => window.removeEventListener('keydown', on);
   }, [route.cand, go]);
 
+  // Todas as áreas do mapa (estados ou municípios), com os votos do candidato em cada uma.
+  // Enquanto o mapa é pedido de novo com o candidato em foco, os dados antigos podem não trazer os votos dele.
   const areas = useMemo(() => {
-    if (!route.cand || !map.data) return null;
-    const list = map.data.areas.map((a) => ({ code: a.code, v: a.votes[route.cand!], total: totalOf(a), lead: Object.entries(a.votes).sort((x, y) => y[1] - x[1])[0]?.[0] === route.cand }))
-      .filter((a) => a.v !== undefined && a.total > 0).map((a) => ({ ...a, pct: (a.v! / a.total) * 100 }));
-    if (!list.length) return null;
-    return {
-      best: [...list].sort((a, b) => b.pct - a.pct).slice(0, 6),
-      worst: [...list].sort((a, b) => a.pct - b.pct).slice(0, 4),
-      votes: [...list].sort((a, b) => b.v! - a.v!).slice(0, 6),
-      led: list.filter((a) => a.lead).length, n: list.length,
-    };
-  }, [route.cand, map.data]);
+    if (!route.cand || !map.data || map.stale) return null;
+    const list: AreaRow[] = map.data.areas.map((a) => {
+      const v = a.votes[route.cand!] ?? 0;
+      const total = totalOf(a);
+      const lead = v > 0 && Object.entries(a.votes).sort((x, y) => y[1] - x[1])[0]?.[0] === route.cand;
+      return { k: a.code, name: areaName(a.code), v, pct: total ? (v / total) * 100 : 0, lead, apurado: a.pctCounted };
+    });
+    return { list, led: list.filter((a) => a.lead).length, comVotos: list.filter((a) => a.v > 0).length, pending: map.data.pending, total: map.data.total };
+  }, [route.cand, map.data, map.stale, areaName]);
 
   if (!route.cand) return null;
   const name = c?.name ?? lite?.name ?? '';
@@ -87,13 +87,11 @@ export function CandidateDrawer() {
                 <button className="ghost-btn" onClick={() => go({ mode: 'duelo', cmp: [r.candidates[0].id, route.cand!], view: 'geral', cand: undefined })}>Duelo com o líder</button>
               )}
             </div>
-            {areas && (
-              <div className="drawer-areas">
-                <AreaList title={`Onde vai melhor (% dos válidos)`} rows={areas.best.map((a) => ({ k: a.code, name: areaName(a.code), pct: a.pct, v: a.v! }))} onPick={(k) => go(route.uf ? { mu: k } : { uf: k })} />
-                <AreaList title="Onde tem mais votos" rows={areas.votes.map((a) => ({ k: a.code, name: areaName(a.code), pct: a.pct, v: a.v! }))} onPick={(k) => go(route.uf ? { mu: k } : { uf: k })} />
-                <AreaList title="Onde vai pior" rows={areas.worst.map((a) => ({ k: a.code, name: areaName(a.code), pct: a.pct, v: a.v! }))} onPick={(k) => go(route.uf ? { mu: k } : { uf: k })} />
-              </div>
-            )}
+            {areas ? (
+              <AreaRanking rows={areas.list} comVotos={areas.comVotos} unit={unit} pending={areas.pending} total={areas.total}
+                arquivo={`${titleCase(name).replace(/\W+/g, '-')}-${route.cargo}-${route.uf ?? 'br'}.csv`}
+                onPick={(k) => go(route.uf ? { mu: k } : { uf: k })} />
+            ) : map.loading || map.stale ? <div className="drawer-loading"><span className="spinner" /> Carregando os votos de {titleCase(name)} em cada {route.uf ? 'município' : 'estado'}…</div> : null}
           </>
         )}
       </aside>
@@ -101,20 +99,65 @@ export function CandidateDrawer() {
   );
 }
 
-function AreaList({ title, rows, onPick }: { title: string; rows: { k: string; name: string; pct: number; v: number }[]; onPick: (k: string) => void }) {
-  const max = Math.max(...rows.map((r) => r.pct), 1);
+interface AreaRow { k: string; name: string; v: number; pct: number; lead: boolean; apurado: number }
+type Ordem = 'votos' | 'melhor' | 'pior' | 'nome';
+
+/** Lista completa: todos os estados/municípios, ordenável, com busca e exportação. */
+function AreaRanking({ rows, comVotos, unit, pending, total, arquivo, onPick }: {
+  rows: AreaRow[]; comVotos: number; unit: string; pending: number; total: number; arquivo: string; onPick: (k: string) => void;
+}) {
+  const [ordem, setOrdem] = useState<Ordem>('votos');
+  const [todos, setTodos] = useState(false);
+  const [busca, setBusca] = useState('');
+  const norm = (x: string) => x.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const lista = useMemo(() => {
+    const q = norm(busca.trim());
+    const base = rows.filter((r) => (todos || r.v > 0) && (!q || norm(r.name).includes(q)));
+    const cmp: Record<Ordem, (a: AreaRow, b: AreaRow) => number> = {
+      votos: (a, b) => b.v - a.v || b.pct - a.pct,
+      melhor: (a, b) => b.pct - a.pct || b.v - a.v,
+      pior: (a, b) => a.pct - b.pct || a.v - b.v,
+      nome: (a, b) => a.name.localeCompare(b.name, 'pt-BR'),
+    };
+    return base.sort(cmp[ordem]);
+  }, [rows, ordem, todos, busca]);
+  // posição de cada área no ranking de votos (fixa, independe da ordenação escolhida)
+  const rank = useMemo(() => new Map([...rows].filter((r) => r.v > 0).sort((a, b) => b.v - a.v).map((r, i) => [r.k, i + 1])), [rows]);
+  const max = Math.max(...lista.map((r) => r.pct), 0.1);
+  const somaVotos = rows.reduce((s, r) => s + r.v, 0);
   return (
-    <div className="area-list">
-      <h3>{title}</h3>
-      <ol>
-        {rows.map((r) => (
-          <li key={r.k} onClick={() => onPick(r.k)}>
-            <span className="al-name">{r.name}</span>
+    <div className="area-rank">
+      <div className="ar-head">
+        <h3>Votos em cada {unit === 'estados' ? 'estado' : 'município'}</h3>
+        <p><b className="num">{fmtInt(comVotos)}</b> de <b className="num">{fmtInt(rows.length)}</b> {unit} com votos · <b className="num">{fmtInt(somaVotos)}</b> votos</p>
+        {pending > 0 && <p className="ar-pend"><span className="spinner" /> ainda carregando {fmtInt(pending)} de {fmtInt(total)} {unit} — a lista completa aparece em instantes</p>}
+      </div>
+      <div className="ar-tools">
+        <Seg size="sm" label="Ordenar" value={ordem} onChange={setOrdem} options={[
+          { id: 'votos', label: 'Mais votos' }, { id: 'melhor', label: 'Melhor %' }, { id: 'pior', label: 'Pior %' }, { id: 'nome', label: 'A–Z' },
+        ]} />
+        <Seg size="sm" label="Quais áreas" value={todos ? 'todos' : 'com'} onChange={(v) => setTodos(v === 'todos')} options={[
+          { id: 'com', label: `Com votos (${fmtInt(comVotos)})` }, { id: 'todos', label: `Todos (${fmtInt(rows.length)})` },
+        ]} />
+      </div>
+      <div className="ar-tools">
+        <input className="input sm ar-busca" type="search" placeholder={`Buscar ${unit === 'estados' ? 'estado' : 'município'}…`} value={busca} onChange={(e) => setBusca(e.target.value)} />
+        <button className="ghost-btn sm" onClick={() => downloadCsv(arquivo, [
+          ['Posição', unit === 'estados' ? 'Estado' : 'Município', 'Votos', '% dos válidos', 'Lidera', '% apurado'],
+          ...[...rows].sort((a, b) => b.v - a.v || a.name.localeCompare(b.name, 'pt-BR')).map((r) => [rank.get(r.k) ?? '', r.name, r.v, r.pct.toFixed(2).replace('.', ','), r.lead ? 'sim' : '', r.apurado.toFixed(2).replace('.', ',')]),
+        ])}>⭳ CSV</button>
+      </div>
+      <ol className="area-list ar-list">
+        {lista.map((r) => (
+          <li key={r.k} onClick={() => onPick(r.k)} className={r.v === 0 ? 'zero' : ''}>
+            <span className="ar-pos num">{rank.get(r.k) ? `${rank.get(r.k)}º` : '—'}</span>
+            <span className="al-name">{r.name}{r.lead && <em className="ar-lead"> ★ lidera</em>}</span>
             <Bar pct={r.pct} max={max} color="var(--c)" height={5} />
             <span className="num">{fmtPct(r.pct, 1)}</span>
             <small className="num">{fmtInt(r.v)}</small>
           </li>
         ))}
+        {!lista.length && <li className="ar-vazio">{busca ? 'Nenhum resultado para a busca.' : 'Sem votos registrados ainda.'}</li>}
       </ol>
     </div>
   );

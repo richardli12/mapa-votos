@@ -639,3 +639,22 @@ kbd { font-family: var(--font); font-size: 11px; padding: 1px 6px; border: 1px s
   .pin-card { position: static; width: auto; margin-top: 10px; box-shadow: none; }
   .pin-callout { white-space: normal; text-align: center; width: max-content; max-width: 90%; }
 }
+
+/* Ficha do candidato: votos em todas as áreas */
+.area-rank { display: flex; flex-direction: column; gap: 10px; }
+.ar-head h3 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); margin: 0 0 4px; }
+.ar-head p { margin: 0; font-size: 13px; color: var(--text-secondary); }
+.ar-head .ar-pend { margin-top: 6px; display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-muted); }
+.ar-tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.ar-busca { flex: 1 1 160px; min-width: 0; }
+.ar-list { max-height: min(56vh, 560px); overflow-y: auto; border: 1px solid var(--line); border-radius: 12px; padding: 2px 6px; }
+.ar-list li { grid-template-columns: 34px minmax(0, 1.4fr) minmax(40px, 1fr) 52px 64px; }
+.ar-list li.zero { opacity: 0.55; }
+.ar-pos { color: var(--text-muted); font-size: 12px; }
+.ar-lead { font-style: normal; font-weight: 600; font-size: 11px; color: var(--c); white-space: nowrap; }
+.ar-vazio { display: block !important; text-align: center; color: var(--text-muted); cursor: default !important; padding: 14px 4px !important; }
+.drawer-loading { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-muted); padding: 8px 0; }
+@media (max-width: 560px) {
+  .ar-list li { grid-template-columns: 30px minmax(0, 1fr) 50px 58px; }
+  .ar-list li .bar { display: none; }
+}
