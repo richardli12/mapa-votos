@@ -6,7 +6,8 @@ import type { CandidateLite } from '../../shared/types';
 import type { BoletimSecao, SecaoResumo, SecoesPayload, UrnaEstrutura } from '../../shared/urnas';
 import { Boletim } from '../components/urnas/Boletim';
 import { SchoolMap, type Ponto } from '../components/urnas/SchoolMap';
-import { Avatar, Bar, Card, downloadCsv, Empty, Seg, slotVar } from '../components/ui';
+import { Exportar } from '../components/Exportar';
+import { Avatar, Bar, Card, Empty, Seg, slotVar } from '../components/ui';
 import { useLocaisEstaticos } from '../hooks/useLocaisEstaticos';
 import { usePoll } from '../hooks/usePoll';
 import type { UrnaMode } from '../hooks/useRoute';
@@ -353,8 +354,22 @@ function SecoesTabela({ secoes, locais, porNumero, titulo, selecionada, onPick }
   const th = (k: OrdemSec, label: string, cls = '') => <th className={`${cls} sortable ${ordem.k === k ? 'on' : ''}`} onClick={() => setOrdem((o) => ({ k, desc: o.k === k ? !o.desc : k !== 'secao' }))}>{label}{ordem.k === k ? (ordem.desc ? ' ↓' : ' ↑') : ''}</th>;
   return (
     <Card title={titulo} sub={`${fmtInt(linhas.length)} seções · clique para abrir o boletim`}
-      actions={<button className="ghost-btn" onClick={() => downloadCsv('secoes.csv', [['Zona', 'Seção', 'Local', 'Escola', 'Situação', 'Aptos', 'Compareceram', 'Brancos', 'Nulos', 'Líder', '% líder', '2º', '% 2º'],
-        ...ord.map((x) => [x.s.z, x.s.s, x.s.l ?? '', nomeLocal.get(`${x.s.z}-${x.s.l}`) ?? '', x.s.st, x.s.apt, x.s.comp, x.s.bra, x.s.nul, porNumero.get(x.l1?.[0] ?? '')?.name ?? x.l1?.[0] ?? '', x.p1.toFixed(2).replace('.', ','), porNumero.get(x.l2?.[0] ?? '')?.name ?? x.l2?.[0] ?? '', x.p2.toFixed(2).replace('.', ',')])])}>⭳ CSV</button>}>
+      actions={<Exportar montar={() => ({
+        arquivo: titulo,
+        titulo,
+        resumo: [
+          { label: 'Seções', valor: fmtInt(linhas.length) },
+          { label: 'Totalizadas', valor: fmtInt(linhas.filter((x) => x.s.st === 'totalizada').length) },
+          { label: 'Aptos', valor: fmtInt(linhas.reduce((t, x) => t + x.s.apt, 0)) },
+          { label: 'Compareceram', valor: fmtInt(linhas.reduce((t, x) => t + x.s.comp, 0)) },
+        ],
+        colunas: [{ titulo: 'Zona', tipo: 'cod' }, { titulo: 'Seção', tipo: 'cod' }, { titulo: 'Local', tipo: 'cod' }, { titulo: 'Escola' }, { titulo: 'Situação' }, { titulo: 'Aptos', tipo: 'int' }, { titulo: 'Comp.', tipo: 'int' }, { titulo: 'Brancos', tipo: 'int' }, { titulo: 'Nulos', tipo: 'int' }, { titulo: 'Líder' }, { titulo: '% líder', tipo: 'pct' }, { titulo: '2º' }, { titulo: '% 2º', tipo: 'pct' }],
+        linhas: ord.map((x) => {
+          const ok = x.s.st === 'totalizada';
+          const nome = (n?: string) => (n ? titleCase(porNumero.get(n)?.name ?? n) : '');
+          return [x.s.z, x.s.s, x.s.l ?? '', titleCase(nomeLocal.get(`${x.s.z}-${x.s.l}`) ?? ''), x.s.st, x.s.apt, x.s.comp, x.s.bra, x.s.nul, ok ? nome(x.l1?.[0]) : '', ok && x.l1 ? x.p1 : '', ok ? nome(x.l2?.[0]) : '', ok && x.l2 ? x.p2 : ''];
+        }),
+      })} />}>
       <div className="table-wrap">
         <table className="tbl">
           <thead><tr>{th('secao', 'Seção')}<th className="hide-sm">Local de votação</th>{th('aptos', 'Aptos', 'r hide-sm')}{th('comp', 'Compar.', 'r')}{th('lider', 'Líder')}<th className="hide-sm">2º</th>{th('margem', 'Margem', 'r')}</tr></thead>

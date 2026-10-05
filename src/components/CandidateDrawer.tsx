@@ -2,7 +2,10 @@ import { Fragment, useEffect, useMemo, useState } from 'react';
 import { fmtInt, fmtPct, titleCase } from '../../shared/format';
 import { totalOf } from '../lib/mapcolor';
 import { useApp } from '../state';
-import { Avatar, Bar, downloadCsv, Seg, slotVar, StatusBadge } from './ui';
+import { slotColor } from '../lib/palette';
+import type { Relatorio } from '../lib/relatorio';
+import { Exportar } from './Exportar';
+import { Avatar, Bar, Seg, slotVar, StatusBadge } from './ui';
 
 function age(birth?: string) {
   if (!birth || !/^\d{2}\/\d{2}\/\d{4}$/.test(birth)) return null;
@@ -14,7 +17,7 @@ function age(birth?: string) {
 const ROLE: Record<string, string> = { v: 'Vice', s1: '1º suplente', s2: '2º suplente' };
 
 export function CandidateDrawer() {
-  const { route, go, result, map, areaName, cands } = useApp();
+  const { route, go, result, map, areaName, cands, palette } = useApp();
   const r = result.data;
   const c = r?.candidates.find((x) => x.id === route.cand);
   const lite = route.cand ? cands.get(route.cand) : undefined;
@@ -89,7 +92,17 @@ export function CandidateDrawer() {
             </div>
             {areas ? (
               <AreaRanking rows={areas.list} comVotos={areas.comVotos} unit={unit} pending={areas.pending} total={areas.total}
-                arquivo={`${titleCase(name).replace(/\W+/g, '-')}-${route.cargo}-${route.uf ?? 'br'}.csv`}
+                relatorio={{
+                  arquivo: `${name}-${route.cargo}-${route.uf ?? 'br'}`,
+                  titulo: `${titleCase(name)} (${c?.party ?? lite?.party ?? ''} ${c?.number ?? lite?.number ?? ''}) — votos por ${route.uf ? 'município' : 'estado'}`,
+                  cor: slotColor(palette, c?.color ?? lite?.color ?? -1),
+                  resumo: [
+                    ...(c && r ? [{ label: 'Votos', valor: fmtInt(c.votes) }, { label: '% dos válidos', valor: fmtPct(c.pct, 2) }, { label: 'Posição', valor: `${position}º de ${r.candidates.length}` }] : []),
+                    { label: `${unit} com votos`, valor: `${fmtInt(areas.comVotos)} de ${fmtInt(areas.list.length)}` },
+                    { label: 'Lidera em', valor: `${fmtInt(areas.led)} ${unit}` },
+                    ...(c?.status ? [{ label: 'Situação', valor: c.status }] : []),
+                  ],
+                }}
                 onPick={(k) => go(route.uf ? { mu: k } : { uf: k })} />
             ) : map.loading || map.stale ? <div className="drawer-loading"><span className="spinner" /> Carregando os votos de {titleCase(name)} em cada {route.uf ? 'município' : 'estado'}…</div> : null}
           </>
@@ -101,10 +114,12 @@ export function CandidateDrawer() {
 
 interface AreaRow { k: string; name: string; v: number; pct: number; lead: boolean; apurado: number }
 type Ordem = 'votos' | 'melhor' | 'pior' | 'nome';
+const ORDEM_LABEL: Record<Ordem, string> = { votos: 'mais votos', melhor: 'melhor %', pior: 'pior %', nome: 'A–Z' };
 
 /** Lista completa: todos os estados/municípios, ordenável, com busca e exportação. */
-function AreaRanking({ rows, comVotos, unit, pending, total, arquivo, onPick }: {
-  rows: AreaRow[]; comVotos: number; unit: string; pending: number; total: number; arquivo: string; onPick: (k: string) => void;
+function AreaRanking({ rows, comVotos, unit, pending, total, relatorio, onPick }: {
+  rows: AreaRow[]; comVotos: number; unit: string; pending: number; total: number;
+  relatorio: Omit<Relatorio, 'colunas' | 'linhas'>; onPick: (k: string) => void;
 }) {
   const [ordem, setOrdem] = useState<Ordem>('votos');
   const [todos, setTodos] = useState(false);
@@ -122,7 +137,7 @@ function AreaRanking({ rows, comVotos, unit, pending, total, arquivo, onPick }: 
     return base.sort(cmp[ordem]);
   }, [rows, ordem, todos, busca]);
   // posição de cada área no ranking de votos (fixa, independe da ordenação escolhida)
-  const rank = useMemo(() => new Map([...rows].filter((r) => r.v > 0).sort((a, b) => b.v - a.v).map((r, i) => [r.k, i + 1])), [rows]);
+  const rank = useMemo(() => new Map([...rows].filter((r) => r.v > 0).sort((a, b) => b.v - a.v || b.pct - a.pct).map((r, i) => [r.k, i + 1])), [rows]);
   const max = Math.max(...lista.map((r) => r.pct), 0.1);
   const somaVotos = rows.reduce((s, r) => s + r.v, 0);
   return (
@@ -142,10 +157,13 @@ function AreaRanking({ rows, comVotos, unit, pending, total, arquivo, onPick }: 
       </div>
       <div className="ar-tools">
         <input className="input sm ar-busca" type="search" placeholder={`Buscar ${unit === 'estados' ? 'estado' : 'município'}…`} value={busca} onChange={(e) => setBusca(e.target.value)} />
-        <button className="ghost-btn sm" onClick={() => downloadCsv(arquivo, [
-          ['Posição', unit === 'estados' ? 'Estado' : 'Município', 'Votos', '% dos válidos', 'Lidera', '% apurado'],
-          ...[...rows].sort((a, b) => b.v - a.v || a.name.localeCompare(b.name, 'pt-BR')).map((r) => [rank.get(r.k) ?? '', r.name, r.v, r.pct.toFixed(2).replace('.', ','), r.lead ? 'sim' : '', r.apurado.toFixed(2).replace('.', ',')]),
-        ])}>⭳ CSV</button>
+        <Exportar montar={() => ({
+          ...relatorio,
+          // o arquivo segue a lista como está na tela: mesma ordem, filtro e busca
+          subtitulo: [`Ordem: ${ORDEM_LABEL[ordem]}`, todos ? `todos os ${unit}` : `só ${unit} com votos`, busca.trim() && `busca: "${busca.trim()}"`].filter(Boolean).join(' · '),
+          colunas: [{ titulo: 'Posição', tipo: 'int' }, { titulo: unit === 'estados' ? 'Estado' : 'Município' }, { titulo: 'Votos', tipo: 'int' }, { titulo: '% dos válidos', tipo: 'pct', barra: true }, { titulo: 'Lidera' }, { titulo: '% apurado', tipo: 'pct' }],
+          linhas: lista.map((r) => [rank.get(r.k) ?? null, r.name, r.v, r.pct, r.lead ? 'sim' : '', r.apurado]),
+        })} />
       </div>
       <ol className="area-list ar-list">
         {lista.map((r) => (

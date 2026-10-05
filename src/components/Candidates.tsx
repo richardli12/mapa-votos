@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
-import { cargoInfo } from '../../shared/cargos';
+import { cargoInfo, cargoLabel } from '../../shared/cargos';
 import { fmtInt, fmtPct, normalizeText, titleCase } from '../../shared/format';
 import type { Candidate, Result } from '../../shared/types';
 import { useApp } from '../state';
-import { Avatar, Bar, Card, downloadCsv, Empty, Seg, slotVar, StatusBadge } from './ui';
+import { Exportar } from './Exportar';
+import { Avatar, Bar, Card, Empty, Seg, slotVar, StatusBadge } from './ui';
 
 export function LeaderCards({ r }: { r: Result }) {
   const { go } = useApp();
@@ -74,8 +75,18 @@ export function CandidateList({ r, limitDefault = 40 }: { r: Result; limitDefaul
 
   return (
     <Card className="cand-card" title={<>Candidatos <span className="count">{fmtInt(r.candidates.length)}</span></>}
-      actions={<button className="ghost-btn" onClick={() => downloadCsv(`candidatos-${r.cargo}-${r.scope.uf ?? 'br'}${r.scope.mu ? '-' + r.scope.mu : ''}.csv`,
-        [['Posição', 'Número', 'Nome', 'Partido', 'Coligação/Federação', 'Votos', '% válidos', 'Situação'], ...r.candidates.map((c, i) => [i + 1, c.number, c.name, c.party, c.coalition ?? '', c.votes, c.pct.toFixed(2).replace('.', ','), c.status || (c.projected ? 'Projeção' : '')])])}>⭳ CSV</button>}>
+      actions={<Exportar montar={() => ({
+        arquivo: `candidatos-${r.cargo}-${r.scope.uf ?? 'br'}${r.scope.mu ? '-' + r.scope.mu : ''}`,
+        titulo: `${cargoLabel(r.cargo, r.scope.uf)} — resultado dos candidatos`,
+        resumo: [
+          { label: 'Votos válidos', valor: fmtInt(r.totals.valid) },
+          { label: 'Comparecimento', valor: fmtPct(r.totals.turnoutPct, 2) },
+          { label: 'Brancos', valor: fmtPct(r.totals.blankPct, 2) },
+          { label: 'Nulos', valor: fmtPct(r.totals.nullPct, 2) },
+        ],
+        colunas: [{ titulo: 'Pos.', tipo: 'int' }, { titulo: 'Número' }, { titulo: 'Nome' }, { titulo: 'Partido' }, { titulo: 'Coligação / Federação' }, { titulo: 'Votos', tipo: 'int' }, { titulo: '% válidos', tipo: 'pct', barra: true }, { titulo: 'Situação' }],
+        linhas: r.candidates.map((c, i) => [i + 1, c.number, titleCase(c.name), c.party, c.coalition ?? c.federation ?? '', c.votes, c.pct, c.status || (c.projected ? 'Projeção' : '')]),
+      })} />}>
       <div className="filters">
         <input className="input" placeholder="Nome ou número…" value={q} onChange={(e) => { setQ(e.target.value); setLimit(limitDefault); }} aria-label="Filtrar candidatos" />
         {parties.length > 1 && (

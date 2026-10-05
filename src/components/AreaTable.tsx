@@ -2,7 +2,8 @@ import { useMemo, useState } from 'react';
 import { fmtInt, fmtPct, normalizeText, titleCase } from '../../shared/format';
 import { ranked, totalOf } from '../lib/mapcolor';
 import { useApp } from '../state';
-import { Avatar, Bar, Card, downloadCsv, slotVar } from './ui';
+import { Exportar } from './Exportar';
+import { Avatar, Bar, Card, slotVar } from './ui';
 
 type SortKey = 'nome' | 'apurado' | 'lider' | 'margem' | 'comparecimento' | 'eleitorado';
 
@@ -50,7 +51,13 @@ export function AreaTable() {
     <Card title={`Resultado por ${unit.toLowerCase()}`} sub={`${fmtInt(rows.length)} ${route.uf || route.det ? 'municípios' : 'estados'} — clique para abrir`}
       actions={<>
         <input className="input sm" placeholder={`Filtrar ${unit.toLowerCase()}…`} value={q} onChange={(e) => setQ(e.target.value)} aria-label="Filtrar áreas" />
-        <button className="ghost-btn" onClick={() => downloadCsv(`areas-${route.cargo}-${route.uf ?? 'br'}.csv`, [[unit, '% apurado', 'Líder', 'Partido', '% líder', '2º', '% 2º', 'Comparecimento'], ...list.map((r) => [r.name, r.a.pctCounted.toFixed(2), r.leader?.name ?? '', r.leader?.party ?? '', r.lpct.toFixed(2), r.second?.name ?? '', r.spct.toFixed(2), r.a.turnoutPct.toFixed(2)])])}>⭳ CSV</button>
+        <Exportar montar={() => ({
+          arquivo: `${unit === 'Estado' ? 'estados' : 'municipios'}-${route.cargo}-${route.uf ?? 'br'}`,
+          titulo: `Resultado por ${unit.toLowerCase()}`,
+          subtitulo: q ? `Filtro: "${q}" — ${fmtInt(list.length)} de ${fmtInt(rows.length)}` : `${fmtInt(rows.length)} ${unit === 'Estado' ? 'estados' : 'municípios'}`,
+          colunas: [{ titulo: unit }, { titulo: '% apurado', tipo: 'pct' }, { titulo: 'Líder' }, { titulo: 'Partido' }, { titulo: '% líder', tipo: 'pct', barra: true }, { titulo: '2º colocado' }, { titulo: '% 2º', tipo: 'pct' }, { titulo: 'Margem (p.p.)', tipo: 'num' }, { titulo: 'Comparec.', tipo: 'pct' }, { titulo: 'Eleitores', tipo: 'int' }],
+          linhas: list.map((r) => [r.name, r.a.pctCounted, r.leader ? titleCase(r.leader.name) : '', r.leader?.party ?? '', r.lpct, r.second ? titleCase(r.second.name) : '', r.spct, Number((r.lpct - r.spct).toFixed(2)), r.a.turnoutPct, r.a.electorate]),
+        })} />
       </>}>
       <div className="table-wrap">
         <table className="tbl">

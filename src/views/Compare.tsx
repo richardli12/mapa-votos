@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
 import { fmtInt, fmtPct, titleCase } from '../../shared/format';
 import { MapView } from '../components/MapView';
-import { Avatar, Card, downloadCsv, Empty, slotVar, StatusBadge } from '../components/ui';
+import { Exportar } from '../components/Exportar';
+import { Avatar, Card, Empty, slotVar, StatusBadge } from '../components/ui';
 import { colorAreas, totalOf } from '../lib/mapcolor';
 import { useApp } from '../state';
 
@@ -86,7 +87,13 @@ export function CompareView() {
       </div>
 
       <Card title={`Confronto por ${route.uf || route.det ? 'município' : 'estado'}`} sub="Clique nos cabeçalhos para ordenar"
-        actions={<button className="ghost-btn" onClick={() => downloadCsv(`comparativo-${route.cargo}.csv`, [['Área', ...chosen.map((c) => c.name), 'Vencedor'], ...sorted.map((a) => [a.name, ...ids.map((id) => a.pct[id].toFixed(2).replace('.', ',')), cands.get(a.winner)?.name ?? ''])])}>⭳ CSV</button>}>
+        actions={<Exportar montar={() => ({
+          arquivo: `comparativo-${route.cargo}-${route.uf ?? 'br'}`,
+          titulo: `Comparativo: ${chosen.map((c) => titleCase(c.name)).join(' × ')}`,
+          resumo: chosen.map((c) => ({ label: `${titleCase(c.name)} (${c.party})`, valor: `${fmtPct(c.pct, 2)} · vence em ${fmtInt(wins.get(c.id) ?? 0)}` })),
+          colunas: [{ titulo: route.uf || route.det ? 'Município' : 'Estado' }, ...chosen.map((c) => ({ titulo: `${titleCase(c.name)} (%)`, tipo: 'pct' as const })), { titulo: 'Vencedor' }],
+          linhas: sorted.map((a) => [a.name, ...ids.map((id) => a.pct[id]), titleCase(cands.get(a.winner)?.name ?? '')]),
+        })} />}>
         {!areas.length ? <Empty>Sem dados por área ainda.</Empty> : (
           <div className="table-wrap">
             <table className="tbl">

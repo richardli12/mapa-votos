@@ -1,9 +1,10 @@
 import { useMemo } from 'react';
-import { cargoInfo } from '../../shared/cargos';
+import { cargoInfo, cargoLabel } from '../../shared/cargos';
 import { fmtInt, fmtPct, titleCase } from '../../shared/format';
 import { Hemicycle } from '../components/Hemicycle';
 import { NationalPanorama } from '../components/National';
-import { Bar, Card, downloadCsv, Empty, slotVar } from '../components/ui';
+import { Exportar } from '../components/Exportar';
+import { Bar, Card, Empty, slotVar } from '../components/ui';
 import { useApp } from '../state';
 
 export function PartiesView() {
@@ -46,7 +47,18 @@ function PartyDetail() {
         </Card>
       )}
       <Card title="Votos por partido" sub={prop ? 'Nominais + legenda' : 'Soma dos votos dos candidatos de cada partido'}
-        actions={<button className="ghost-btn" onClick={() => downloadCsv(`partidos-${r.cargo}-${r.scope.uf ?? 'br'}.csv`, [['Partido', 'Nome', 'Federação', 'Votos', '%', 'Legenda', 'Candidatos', 'Cadeiras'], ...r.parties.map((p) => [p.party, p.name, p.federation ?? '', p.votes, p.pct.toFixed(2).replace('.', ','), p.legend, p.candidates, p.seats ?? 0])])}>⭳ CSV</button>}>
+        actions={<Exportar montar={() => ({
+          arquivo: `partidos-${r.cargo}-${r.scope.uf ?? 'br'}${r.scope.mu ? '-' + r.scope.mu : ''}`,
+          titulo: `${cargoLabel(r.cargo, r.scope.uf)} — votos por partido`,
+          resumo: [
+            { label: 'Votos válidos', valor: fmtInt(r.totals.valid) },
+            { label: 'Votos de legenda', valor: fmtInt(r.totals.legend) },
+            { label: 'Partidos', valor: fmtInt(r.parties.length) },
+            ...(prop ? [{ label: 'Quociente eleitoral', valor: r.quotient ? fmtInt(r.quotient) : '—' }] : []),
+          ],
+          colunas: [{ titulo: 'Partido' }, { titulo: 'Nome' }, { titulo: 'Federação' }, { titulo: 'Votos', tipo: 'int' }, { titulo: '%', tipo: 'pct', barra: true }, { titulo: 'Legenda', tipo: 'int' }, { titulo: 'Candidatos', tipo: 'int' }, ...(prop ? [{ titulo: 'Cadeiras', tipo: 'int' as const }] : [])],
+          linhas: r.parties.map((p) => [p.party, p.name, p.federation ?? '', p.votes, p.pct, p.legend, p.candidates, ...(prop ? [p.seats ?? 0] : [])]),
+        })} />}>
         <div className="table-wrap">
           <table className="tbl parties">
             <thead><tr><th>Partido</th><th className="hide-sm">Mais votado</th><th className="r">Votos</th><th className="bar-col" /><th className="r">%</th>{prop && <th className="r hide-sm">Legenda</th>}<th className="r hide-sm">Cand.</th>{prop && <th className="r">Cadeiras</th>}</tr></thead>

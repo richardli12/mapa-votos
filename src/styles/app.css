@@ -658,3 +658,6 @@ kbd { font-family: var(--font); font-size: 11px; padding: 1px 6px; border: 1px s
   .ar-list li { grid-template-columns: 30px minmax(0, 1fr) 50px 58px; }
   .ar-list li .bar { display: none; }
 }
+
+.export-btns { display: inline-flex; gap: 6px; flex: none; }
+.export-btns .ghost-btn { white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
