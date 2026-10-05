@@ -52,6 +52,25 @@ npm test
 npm run typecheck
 ```
 
+## Hospedar na Vercel
+
+O projeto já vem pronto para a Vercel (`vercel.json` + `npm run build:vercel`, no formato [Build Output API](https://vercel.com/docs/build-output-api/v3)):
+
+1. Na Vercel: **Add New → Project** e importe este repositório. Não precisa mudar nada nas configurações de build — o `vercel.json` já define o comando (se o painel pedir um *Framework Preset*, use **Other**).
+2. Em **Settings → Environment Variables**, defina o que quiser da tabela de variáveis abaixo (por exemplo `AGORA_MODE=live` na noite da eleição). Sem nada definido, roda em `auto`.
+3. Deploy. A interface sai como arquivos estáticos e cada rota `/api/*` vira uma função Node.js.
+
+Como fica na Vercel:
+
+- **Região `gru1` (São Paulo)**, definida no `vercel.json` — perto do TSE e do público. Dá para trocar em *Settings → Functions*.
+- **Cache de CDN**: as respostas da API saem com `s-maxage` + `stale-while-revalidate` (10 s ao vivo, 1 h para a configuração de municípios e fotos). Milhares de visitantes viram poucas execuções da função e poucas consultas ao TSE.
+- **Mapa por município ao vivo**: cada consulta espera até `AGORA_MAP_WAIT_MS` (4 s) o carregamento avançar dentro da própria função; a interface vai pedindo o restante até completar.
+- O cache em memória vale por instância da função; o que sustenta o tráfego é o cache da CDN.
+
+Para conferir o pacote localmente: `npm run build:vercel` gera `.vercel/output/` (estáticos em `static/`, funções em `functions/api/*.func`).
+
+Se preferir um servidor próprio (VPS, Docker, Render, Railway…), use `npm run build && npm start`.
+
 ## Fontes de dados e modos
 
 O servidor tem três modos (`AGORA_MODE`):
@@ -94,6 +113,7 @@ O modo ao vivo foi validado contra arquivos oficiais reais de 04/10/2026 (presid
 | `AGORA_CYCLE` | `ele2026` | Ciclo eleitoral na configuração oficial |
 | `AGORA_REFRESH` | `30` | Segundos entre atualizações na interface |
 | `AGORA_CONCURRENCY` | `6` | Requisições simultâneas à fonte (o TSE bloqueia excesso) |
+| `AGORA_MAP_WAIT_MS` | `4000` | Quanto a consulta do mapa espera a primeira carga dos municípios |
 | `STRICT_SIGNATURE` | — | `1` recusa arquivos do TSE com assinatura inválida |
 | `DEMO_CYCLE_MINUTES` | `18` | Duração de um ciclo completo da simulação |
 
@@ -118,7 +138,9 @@ Todas as respostas são JSON normalizado (o mesmo formato para BP, TSE e simula�
 
 ```
 server/
-  index.ts           servidor HTTP: API + arquivos estáticos (gzip), escolha de fonte
+  api.ts             rotas /api/*, escolha de fonte e cabeçalhos de cache (CDN)
+  index.ts           servidor próprio: API + arquivos estáticos (gzip)
+  vercel.ts          entrada das funções serverless na Vercel
   tse/upstream.ts    cliente das fontes: cache, ETag, limite de concorrência, fallback, JWS + Ed25519
   tse/live.ts        provedor ao vivo: config oficial, eleições por cargo, carga progressiva do mapa
   tse/normalize.ts   arquivos EA20/EA14 → modelo normalizado (+ projeção de cadeiras)
@@ -133,6 +155,7 @@ src/                 interface React (Vite)
   views/             Comparar, Partidos, Perfil do voto
 public/geo/          malhas TopoJSON simplificadas (UFs, municípios por UF, Brasil)
 scripts/build-geo.mjs  gera as malhas e o índice (npm run geo)
+scripts/build-vercel.mjs  gera .vercel/output (estáticos + funções)
 tests/               normalização, cadeiras, provedor ao vivo, simulação
 ```
 

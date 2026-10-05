@@ -1,8 +1,9 @@
-import { readFileSync } from 'node:fs';
 import type { Municipality } from '../shared/types.ts';
+// Importado (e não lido do disco) para entrar no pacote da função serverless.
+import data from '../shared/data/municipios.json' with { type: 'json' };
 
 type Row = [string, string, string, string, number, number | null, number | null];
-const rows = JSON.parse(readFileSync(new URL('../shared/data/municipios.json', import.meta.url), 'utf8')) as Row[];
+const rows = data as unknown as Row[];
 
 export const MUNICIPALITIES: Municipality[] = rows.map(([code, ibge, name, uf, capital, lon, lat]) => ({
   code, ibge, name, uf: uf.toLowerCase(), capital: capital === 1, lon, lat,

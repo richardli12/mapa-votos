@@ -17,7 +17,7 @@ interface RoundCtx { round: number; pleito: string; date: string; elections: Raw
 interface Ctx { cycle: string; dirs: Record<string, string>; rounds: RoundCtx[]; munis: Municipality[]; munByCode: Map<string, Municipality> }
 
 interface Stored { area: MapArea; top: Result['candidates']; many: boolean; updatedAt: string | null; source: SourceKind }
-interface Loader { items: string[]; done: Map<string, Stored>; tried: Set<string>; running: boolean; startedAt: number; touched: number }
+interface Loader { items: string[]; done: Map<string, Stored>; tried: Set<string>; running: boolean; startedAt: number; touched: number; run?: Promise<void> }
 
 export class LiveProvider implements Provider {
   readonly up: Upstream;
@@ -26,11 +26,13 @@ export class LiveProvider implements Provider {
   private loaders = new Map<string, Loader>();
   private cycle: string;
   private refresh: number;
+  private mapWait: number;
 
   constructor(env = process.env) {
     this.up = new Upstream(sourcesFromEnv(env), Number(env.AGORA_CONCURRENCY ?? 6));
     this.cycle = env.AGORA_CYCLE ?? 'ele2026';
     this.refresh = Number(env.AGORA_REFRESH ?? 30);
+    this.mapWait = Number(env.AGORA_MAP_WAIT_MS ?? 4000);
   }
 
   private async getAny(paths: string[], ttl: number): Promise<Fetched> {
@@ -160,7 +162,7 @@ export class LiveProvider implements Provider {
     if (!l.running && stale) {
       l.running = true; l.startedAt = Date.now();
       const loader = l;
-      (async () => {
+      loader.run = (async () => {
         let next = 0;
         const worker = async () => {
           while (next < loader.items.length) {
@@ -176,7 +178,7 @@ export class LiveProvider implements Provider {
           }
         };
         await Promise.all(Array.from({ length: 6 }, worker));
-      })().finally(() => { loader.running = false; });
+      })().finally(() => { loader.running = false; loader.run = undefined; });
     }
     // descarta carregadores sem uso
     for (const [k, v] of this.loaders) if (Date.now() - v.touched > 600_000) this.loaders.delete(k);
@@ -198,6 +200,13 @@ export class LiveProvider implements Provider {
       header = await this.result(cargo, { level: 'uf', uf }, round).catch(() => null);
     }
     const l = this.loader(`${round}:${cargo}:${parent.level}:${parent.uf ?? ''}`, items, fetchOne);
+    // Em ambientes serverless (Vercel) o trabalho só roda garantidamente dentro da requisição:
+    // na primeira carga, espera avançar alguns segundos (as atualizações seguintes não bloqueiam a resposta).
+    if (l.run && this.mapWait > 0 && l.tried.size < l.items.length) {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      await Promise.race([l.run, new Promise<void>((r) => { timer = setTimeout(r, this.mapWait); })]);
+      clearTimeout(timer);
+    }
     const areas: MapArea[] = [];
     const cands = new Map<string, CandidateLite>();
     const addCand = (c: Result['candidates'][number]) => { if (!cands.has(c.id)) cands.set(c.id, { id: c.id, name: c.name, number: c.number, party: c.party, color: c.color, photo: c.photo }); };
