@@ -10,7 +10,9 @@ Central de apuração das Eleições 2026.
 |---|---|---|
 | ![Comparativo](docs/comparativo.png) | ![Câmara SP](docs/camara-sp.png) | ![Governadores](docs/governadores.png) |
 
-> As capturas acima usam o **modo simulação** — os candidatos e números são fictícios.
+![Apuração por urna: mapa de escolas e boletim de urna](docs/urnas.png)
+
+> As capturas acima usam o **modo simulação** — candidatos, escolas e números são fictícios.
 
 ## O que tem
 
@@ -28,6 +30,11 @@ Central de apuração das Eleições 2026.
 - **Partidos**: votos nominais e de legenda, **hemiciclo** com a bancada eleita — ou a **projeção de cadeiras** durante a apuração, calculada pelas regras brasileiras (quociente eleitoral, quociente partidário com cláusula de 10% e sobras pelas maiores médias, Lei 14.211/2021).
 - **Panorama nacional** para os cargos estaduais: as 27 disputas lado a lado e a composição projetada (governos, Senado, Câmara com 513 cadeiras, Assembleias).
 - **Perfil do voto**: por região, capital × interior, porte do município e dispersão tamanho × votação.
+- **Urnas: zona, escola e seção** — desce até o boletim de cada urna:
+  - escolha a zona eleitoral, o local de votação (escola) e a seção, com busca por nome, bairro ou número;
+  - **mapa das escolas** do município: cada local de votação é um ponto do tamanho do seu eleitorado, colorido pelo líder, pela força de um candidato, pelo comparecimento ou pelo andamento da apuração;
+  - resumo de cada zona e escola (aptos, comparecimento, brancos, nulos, votos por candidato e por partido) e tabela de seções ordenável com CSV;
+  - **boletim de urna digital** de cada seção, com todos os cargos, horários de abertura e encerramento, número da urna, código de carga e hash do arquivo — lido do arquivo oficial `.bu` (ASN.1) publicado pelo TSE.
 - **Evolução da apuração**: curva das porcentagens conforme as urnas são totalizadas, com as **viradas** marcadas.
 - Tema claro/escuro, responsivo (celular), atalhos de teclado (`/` busca, `Esc` fecha a ficha), paleta validada para daltonismo.
 
@@ -103,6 +110,22 @@ Aceita tanto **JWS assinado** (formato oficial de 2026) quanto **JSON puro**. No
 
 O modo ao vivo foi validado contra arquivos oficiais reais de 04/10/2026 (presidente por UF, governador, senado, deputados, distrital do DF, municípios e EA14), incluindo a verificação das assinaturas.
 
+### Apuração por urna (zona, escola e seção)
+
+Os boletins de urna ficam na área `arquivo-urna` da divulgação oficial:
+
+| Arquivo | Conteúdo |
+|---|---|
+| `/oficial/ele2026/arquivo-urna/<pleito>/config/<uf>/<uf>-p<pleito>-cs.jws` (EA16) | municípios → zonas → seções (inclusive seções agregadas) |
+| `.../dados/<uf>/<município>/<zona>/<seção>/p<pleito>-<uf>-m<município>-z<zona>-s<seção>-aux.jws` | índice dos arquivos da urna da seção |
+| `.../dados/<uf>/<município>/<zona>/<seção>/<hash>/<arquivo>.bu` | boletim de urna (binário ASN.1) |
+
+O boletim é decodificado no próprio servidor (`server/urna/bu.ts`, sem dependências), conforme a especificação ASN.1 oficial do TSE — o decodificador foi conferido campo a campo contra a ferramenta de referência nos boletins de exemplo publicados pelo TSE. Cada boletim tem todos os cargos da seção; uma vez publicado não muda, então fica em cache permanente.
+
+Cada seção é um arquivo, então a soma é feita por **zona eleitoral** e, em municípios com até `URNA_MAX_SECOES` seções (1.200), também para o município inteiro. Os boletins são lidos aos poucos, respeitando o limite de requisições do TSE.
+
+**Nomes e endereços das escolas:** os arquivos de urna só trazem o *número* do local de votação. Nome, endereço, bairro e coordenadas vêm do conjunto "Eleitorado — locais de votação" dos dados abertos do TSE. O `npm run build:vercel` tenta baixá-lo e gerar `public/locais/<uf>/<município>.json` (comando avulso: `npm run locais`; outro endereço: `LOCAIS_URL=...`; arquivo local: `LOCAIS_FILE=...`). Se não conseguir, o build segue e a tela mostra os locais pelo número, num mosaico por zona em vez do mapa.
+
 ### Variáveis de ambiente
 
 | Variável | Padrão | Descrição |
@@ -115,7 +138,10 @@ O modo ao vivo foi validado contra arquivos oficiais reais de 04/10/2026 (presid
 | `AGORA_CYCLE` | `ele2026` | Ciclo eleitoral na configuração oficial |
 | `AGORA_REFRESH` | `30` | Segundos entre atualizações na interface |
 | `AGORA_CONCURRENCY` | `6` | Requisições simultâneas à fonte (o TSE bloqueia excesso) |
-| `AGORA_MAP_WAIT_MS` | `4000` | Quanto a consulta do mapa espera a primeira carga dos municípios |
+| `AGORA_MAP_WAIT_MS` | `4000` | Quanto a consulta do mapa (ou das seções) espera a primeira carga |
+| `URNA_MAX_SECOES` | `1200` | Até quantas seções a aba Urnas soma o município inteiro (acima disso, por zona) |
+| `LOCAIS_URL` / `LOCAIS_FILE` | dados abertos do TSE 2026 | Origem do cadastro de locais de votação usado no build |
+| `RADAR_LOCAIS` | — | `0` desliga o download dos locais no build |
 | `STRICT_SIGNATURE` | — | `1` recusa arquivos do TSE com assinatura inválida |
 | `DEMO_CYCLE_MINUTES` | `18` | Duração de um ciclo completo da simulação |
 
@@ -133,6 +159,9 @@ Todas as respostas são JSON normalizado (o mesmo formato para BP, TSE e simula�
 | `GET /api/progresso` | `turno?` | andamento da apuração por UF |
 | `GET /api/municipios` | — | municípios com códigos TSE/IBGE e coordenadas |
 | `GET /api/foto` | `p` | foto do candidato (proxy com cache) |
+| `GET /api/urnas/estrutura` | `uf`, `mu` | zonas, seções e (na simulação) locais de votação |
+| `GET /api/urnas/secoes` | `cargo`, `uf`, `mu`, `zona?`, `foco?` | resumo de cada seção para o cargo |
+| `GET /api/urnas/boletim` | `uf`, `mu`, `zona`, `secao` | boletim de urna completo da seção (todos os cargos) |
 
 `cargo` ∈ `presidente`, `governador`, `senador`, `depfederal`, `depestadual`. `mu` é o código TSE de 5 dígitos. Na simulação, `t` (0–1) posiciona a máquina do tempo.
 
@@ -146,6 +175,9 @@ server/
   tse/upstream.ts    cliente das fontes: cache, ETag, limite de concorrência, fallback, JWS + Ed25519
   tse/live.ts        provedor ao vivo: config oficial, eleições por cargo, carga progressiva do mapa
   tse/normalize.ts   arquivos EA20/EA14 → modelo normalizado (+ projeção de cadeiras)
+  urna/bu.ts         decodificador do boletim de urna (.bu, ASN.1 BER)
+  urna/live.ts       zonas/seções (EA16), índice da seção e boletins oficiais
+  urna/demo.ts       simulação de zonas, escolas (nomes fictícios) e boletins
   demo/demo.ts       simulação determinística de todos os cargos nos 5.570 municípios
 shared/
   types.ts           modelo comum servidor ↔ interface
@@ -158,6 +190,7 @@ src/                 interface React (Vite)
 public/geo/          malhas TopoJSON simplificadas (UFs, municípios por UF, Brasil)
 scripts/build-geo.mjs  gera as malhas e o índice (npm run geo)
 scripts/build-vercel.mjs  gera .vercel/output (estáticos + funções)
+scripts/build-locais.mjs  gera public/locais a partir do cadastro de locais de votação do TSE
 tests/               normalização, cadeiras, provedor ao vivo, simulação
 ```
 

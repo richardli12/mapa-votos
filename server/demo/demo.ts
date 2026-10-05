@@ -2,7 +2,7 @@
 // sem depender da fonte ao vivo. A apuração avança com o relógio (ou pela "máquina do tempo", parâmetro t):
 // as regiões totalizam em ritmos diferentes, o que produz viradas como numa noite de eleição real.
 import { assignColors } from '../../shared/colors.ts';
-import { CARGOS, cargoLabel } from '../../shared/cargos.ts';
+import { CARGOS, cargoCode, cargoLabel } from '../../shared/cargos.ts';
 import { allocateSeats, type SeatGroup } from '../../shared/seats.ts';
 import { UFS, ufInfo, ufName, type Region } from '../../shared/ufs.ts';
 import type { CargoId, Candidate, CandidateLite, CountStatus, MapArea, MapPayload, MetaPayload, Municipality, PartyResult, ProgressRow, Result, Running, Scope, Totals } from '../../shared/types.ts';
@@ -56,6 +56,18 @@ interface MuniStat {
 }
 const REGION_START: Record<Region, [number, number]> = { Sul: [0.0, 0.22], Sudeste: [0.02, 0.3], 'Centro-Oeste': [0.06, 0.32], Nordeste: [0.14, 0.42], Norte: [0.2, 0.46] };
 
+// Eleitorado aproximado (milhares) das maiores cidades, para a simulação ficar crível.
+const BIG_CITIES: Record<string, number> = Object.fromEntries(Object.entries({
+  'sp:SÃO PAULO': 9300, 'rj:RIO DE JANEIRO': 5000, 'mg:BELO HORIZONTE': 1950, 'ba:SALVADOR': 1980, 'ce:FORTALEZA': 1790, 'am:MANAUS': 1500,
+  'pr:CURITIBA': 1330, 'pe:RECIFE': 1180, 'go:GOIÂNIA': 1070, 'pa:BELÉM': 1060, 'rs:PORTO ALEGRE': 1080, 'sp:GUARULHOS': 870, 'sp:CAMPINAS': 840,
+  'ma:SÃO LUÍS': 720, 'rj:SÃO GONÇALO': 680, 'al:MACEIÓ': 620, 'rj:DUQUE DE CAXIAS': 630, 'rn:NATAL': 560, 'pi:TERESINA': 580, 'ms:CAMPO GRANDE': 640,
+  'rj:NOVA IGUAÇU': 580, 'sp:SÃO BERNARDO DO CAMPO': 620, 'pb:JOÃO PESSOA': 550, 'sp:SANTO ANDRÉ': 550, 'sp:OSASCO': 540, 'pe:JABOATÃO DOS GUARARAPES': 500,
+  'sp:RIBEIRÃO PRETO': 530, 'mg:UBERLÂNDIA': 500, 'mg:CONTAGEM': 470, 'sp:SOROCABA': 510, 'se:ARACAJU': 450, 'ba:FEIRA DE SANTANA': 430, 'mt:CUIABÁ': 430,
+  'sc:JOINVILLE': 450, 'mg:JUIZ DE FORA': 430, 'pr:LONDRINA': 420, 'go:APARECIDA DE GOIÂNIA': 400, 'rj:NITERÓI': 400, 'ro:PORTO VELHO': 330,
+  'sc:FLORIANÓPOLIS': 380, 'es:VILA VELHA': 370, 'es:SERRA': 360, 'rs:CAXIAS DO SUL': 360, 'ap:MACAPÁ': 300, 'sp:SÃO JOSÉ DOS CAMPOS': 500,
+  'sp:SANTOS': 360, 'es:VITÓRIA': 260, 'rr:BOA VISTA': 270, 'to:PALMAS': 220, 'ac:RIO BRANCO': 270, 'pr:MARINGÁ': 300, 'mg:BETIM': 300,
+}).map(([k, v]) => [k, v * 1000]));
+
 function buildMunis(): MuniStat[] {
   const out: MuniStat[] = [];
   for (const u of UFS) {
@@ -64,11 +76,14 @@ function buildMunis(): MuniStat[] {
     const cLon = withPos.reduce((s, m) => s + m.lon!, 0) / Math.max(1, withPos.length);
     const cLat = withPos.reduce((s, m) => s + m.lat!, 0) / Math.max(1, withPos.length);
     const capShare = u.uf === 'df' ? 1 : list.length < 30 ? 0.42 : 0.12 + 2.2 / Math.sqrt(list.length);
-    const weights = list.map((m) => (m.capital ? 0 : Math.exp(1.15 * gauss(`el:${m.code}`))));
-    const wsum = weights.reduce((s, w) => s + w, 0) || 1;
     const total = ELECTORATE_K[u.uf] * 1000;
+    // grandes cidades com eleitorado aproximado; o restante da UF é repartido entre os demais municípios
+    const known = list.map((m) => BIG_CITIES[`${u.uf}:${m.name}`] ?? (m.capital && u.uf !== 'df' && !BIG_CITIES[`${u.uf}:${m.name}`] ? total * capShare : 0));
+    const knownSum = known.reduce((s, k) => s + k, 0);
+    const weights = list.map((m, i) => (known[i] ? 0 : Math.exp(1.15 * gauss(`el:${m.code}`))));
+    const wsum = weights.reduce((s, w) => s + w, 0) || 1;
     list.forEach((m, i) => {
-      const electorate = Math.max(1200, Math.round(m.capital ? total * capShare : (total * (1 - capShare) * weights[i]) / wsum));
+      const electorate = Math.max(1200, Math.round(u.uf === 'df' ? total : known[i] || ((total - knownSum) * weights[i]) / wsum));
       const [a, b] = REGION_START[u.region];
       const start = a + (b - a) * rand(`st:${m.code}`) + (m.capital ? -0.03 : 0.02 * rand(`st2:${m.code}`));
       const dur = Math.min(0.12 + 0.35 * rand(`du:${m.code}`) + (m.capital ? 0.22 : 0) + Math.log10(electorate) * 0.02, 0.98 - Math.max(0, start));
@@ -110,8 +125,21 @@ interface Race {
 const softmax = (xs: number[]) => { const m = Math.max(...xs); const e = xs.map((x) => Math.exp(x - m)); const s = e.reduce((a, b) => a + b, 0); return e.map((x) => x / s); };
 const distKm = (a: MuniStat, lon: number, lat: number) => Math.hypot((a.lon - lon) * 111 * Math.cos((a.lat * Math.PI) / 180), (a.lat - lat) * 111);
 
+/** Dados de uma disputa no município, para a simulação de boletins de urna. */
+export interface DemoUrnaRace {
+  cargo: CargoId; code: number; eleicao: number; tipo: 'majoritario' | 'proporcional';
+  cands: { numero: number; partido: number }[]; final: number[]; legend: { partido: number; votos: number }[];
+  voteMult: number; blank: number; nul: number;
+}
+export interface DemoUrnaBase {
+  name: string; capital: boolean; lon: number; lat: number; electorate: number; sections: number; turnout: number;
+  /** fração das seções do município já totalizadas no momento pedido */
+  frac: number; races: DemoUrnaRace[];
+}
+
 export class DemoProvider implements Provider {
   private munis = buildMunis();
+  private muniByCode = new Map(this.munis.map((m) => [m.m.code, m]));
   private races = new Map<string, Race>();
   private cache = new Map<string, unknown>();
   private epoch: number;
@@ -133,6 +161,27 @@ export class DemoProvider implements Provider {
     if (g >= 1) return 1;
     const p = Math.min(1, Math.max(0, (g - ms.start) / ms.dur));
     return Math.floor(ms.sections * p) / ms.sections;
+  }
+
+  /** Base para simular zonas, locais de votação e seções de um município. */
+  urnaBase(uf: string, mu: string, t?: number): DemoUrnaBase | null {
+    const ms = this.muniByCode.get(mu);
+    if (!ms || ms.m.uf !== uf) return null;
+    const g = this.clock(t);
+    const races = (['presidente', 'governador', 'senador', 'depfederal', 'depestadual'] as CargoId[]).map((cargo) => {
+      const race = this.race(cargo, cargo === 'presidente' ? null : uf);
+      const mi = race.muniIndex.get(mu)!;
+      const nc = race.cands.length, np = race.parties.length;
+      const prop = CARGOS.find((c) => c.id === cargo)!.proportional;
+      return {
+        cargo, code: cargoCode(cargo, uf), eleicao: cargo === 'presidente' ? 6257 : 6259, tipo: prop ? 'proporcional' : 'majoritario',
+        cands: race.cands.map((c) => ({ numero: Number(c.number), partido: PARTY.get(c.party)?.n ?? Number(c.number.slice(0, 2)) })),
+        final: Array.from(race.final.subarray(mi * nc, mi * nc + nc)),
+        legend: race.legendFinal.length ? race.parties.map((p, pi) => ({ partido: PARTY.get(p)?.n ?? 0, votos: race.legendFinal[mi * np + pi] })) : [],
+        voteMult: race.voteMult, blank: ms.blank * race.blankMult, nul: ms.nul * race.nullMult,
+      } satisfies DemoUrnaRace;
+    });
+    return { name: ms.m.name, capital: ms.m.capital, lon: ms.lon, lat: ms.lat, electorate: ms.electorate, sections: ms.sections, turnout: ms.turnout, frac: this.muniFrac(ms, g), races };
   }
 
   // ——— Construção das disputas ———

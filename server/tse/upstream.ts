@@ -4,6 +4,9 @@
 import { createPublicKey, verify, type KeyObject } from 'node:crypto';
 import type { SourceKind } from '../../shared/types.ts';
 
+// O CDN do TSE recusa clientes sem User-Agent de navegador.
+export const BROWSER_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36 RadarEleicoes/1.0';
+
 export interface SourceDef { kind: SourceKind; base: string; label: string }
 
 export function sourcesFromEnv(env = process.env): SourceDef[] {
@@ -86,6 +89,30 @@ export class Upstream {
     return task;
   }
 
+  private bins = new Map<string, Promise<Uint8Array | null>>();
+  /**
+   * Arquivo binário imutável (ex.: boletim de urna .bu, cujo caminho inclui o hash do arquivo).
+   * Fica em cache sem prazo; `null` quando nenhuma fonte tem o arquivo.
+   */
+  getBinary(path: string): Promise<Uint8Array | null> {
+    let p = this.bins.get(path);
+    if (!p) {
+      p = this.slot(async () => {
+        for (const src of this.sources) {
+          try {
+            const res = await fetch(src.base + path, { headers: { 'User-Agent': BROWSER_UA, Accept: '*/*' }, signal: AbortSignal.timeout(10_000) });
+            if (res.ok) return new Uint8Array(await res.arrayBuffer());
+          } catch { /* próxima fonte */ }
+        }
+        return null;
+      });
+      p.then((v) => { if (!v) setTimeout(() => this.bins.delete(path), 30_000); });
+      this.bins.set(path, p);
+      if (this.bins.size > 20_000) this.bins.delete(this.bins.keys().next().value!);
+    }
+    return p;
+  }
+
   private async fetchAll(path: string, ttlMs: number, hit?: Entry): Promise<Fetched> {
     let lastStatus = 0;
     for (let i = 0; i < this.sources.length; i++) {
@@ -93,7 +120,7 @@ export class Upstream {
       if (down && down > Date.now() && i < this.sources.length - 1) continue;
       const src = this.sources[i];
       try {
-        const headers: Record<string, string> = { Accept: 'application/json, application/jose, text/plain, */*', 'User-Agent': 'radar-eleicoes-triad3/1.0' };
+        const headers: Record<string, string> = { Accept: 'application/json, application/jose, text/plain, */*', 'User-Agent': BROWSER_UA };
         if (hit && hit.sourceIndex === i) {
           if (hit.etag) headers['If-None-Match'] = hit.etag;
           if (hit.modified) headers['If-Modified-Since'] = hit.modified;

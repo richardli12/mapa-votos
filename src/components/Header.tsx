@@ -53,6 +53,7 @@ export function ViewTabs() {
     { id: 'comparar', label: 'Comparar', icon: '⇆' },
     { id: 'partidos', label: 'Partidos', icon: '◔' },
     { id: 'perfil', label: 'Perfil do voto', icon: '▤' },
+    { id: 'urnas', label: 'Urnas: zona, escola e seção', icon: '▦' },
   ];
   return (
     <div className="view-tabs" role="tablist" aria-label="Painel">

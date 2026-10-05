@@ -9,7 +9,7 @@ import path from 'node:path';
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
 const OUT = path.join(ROOT, '.vercel', 'output');
-const ROUTES = ['meta', 'municipios', 'resultado', 'mapa', 'progresso', 'foto', 'saude'];
+const ROUTES = ['meta', 'municipios', 'resultado', 'mapa', 'progresso', 'foto', 'saude', 'urnas/estrutura', 'urnas/secoes', 'urnas/boletim'];
 const RUNTIME = process.env.AGORA_VERCEL_RUNTIME ?? 'nodejs22.x';
 
 await rm(OUT, { recursive: true, force: true });

@@ -13,6 +13,9 @@ export const urls = {
   resultado: (q: Query) => `/api/resultado?${qs({ cargo: q.cargo, uf: q.uf, mu: q.mu, ...common(q) })}`,
   mapa: (q: Query, foco: string[], detalhe?: 'mu') => `/api/mapa?${qs({ cargo: q.cargo, uf: q.uf, foco: foco.join(',') || undefined, detalhe, ...common(q) })}`,
   progresso: (q: Partial<Query>) => `/api/progresso?${qs(common(q))}`,
+  urnasEstrutura: (q: Query) => `/api/urnas/estrutura?${qs({ uf: q.uf, mu: q.mu, ...common(q) })}`,
+  urnasSecoes: (q: Query, zona: number | null, foco: string[]) => `/api/urnas/secoes?${qs({ cargo: q.cargo, uf: q.uf, mu: q.mu, zona: zona ?? undefined, foco: foco.join(',') || undefined, ...common(q) })}`,
+  urnasBoletim: (q: Query, zona: number, secao: number) => `/api/urnas/boletim?${qs({ uf: q.uf, mu: q.mu, zona, secao, ...common(q) })}`,
 };
 
 export async function getJson<T>(url: string, signal?: AbortSignal): Promise<T> {

@@ -22,6 +22,7 @@ import { AppCtx, useApp, type AppState } from './state';
 import { CompareView } from './views/Compare';
 import { PartiesView } from './views/Parties';
 import { ProfileView } from './views/Profile';
+import { UrnasView } from './views/Urnas';
 
 export function App() {
   const [route, go] = useRoute();
@@ -96,6 +97,7 @@ function Body() {
   const { route, result } = useApp();
   const { prop } = useMapModes();
   const needsUf = route.cargo !== 'presidente' && !route.uf;
+  if (route.view === 'urnas') return <UrnasView />;
   if (route.view === 'comparar') return needsUf ? <PickState /> : <CompareView />;
   if (route.view === 'partidos') return <PartiesView />;
   if (route.view === 'perfil') return needsUf ? <PickState /> : <ProfileView />;

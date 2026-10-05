@@ -81,9 +81,10 @@ export function colorAreas(payload: MapPayload | null, o: ColorOpts): Coloring {
       const breaks: number[] = [];
       for (let x = step; x < max && breaks.length < 6; x += step) breaks.push(x);
       const colors = ramp(p, slotColor(p, c.color < 0 ? 0 : c.color), breaks.length + 1);
+      const dg = step < 1 ? 1 : 0;
       const counts = new Array(breaks.length + 1).fill(0);
       for (const a of areas) { const x = pct(a); if (x === null) continue; const b = binOf(x, breaks); counts[b]++; fill.set(a.code, colors[b]); }
-      return { fill, legend: { kind: 'seq', title: `Força de ${titleCase(c.name)}`, note: '% dos votos válidos em cada área', items: colors.map((color, i) => ({ color, count: counts[i], label: i === 0 ? `< ${fmtPct(breaks[0] ?? max, 0)}` : i === breaks.length ? `≥ ${fmtPct(breaks[i - 1], 0)}` : `${fmtPct(breaks[i - 1], 0)} – ${fmtPct(breaks[i], 0)}` })) } };
+      return { fill, legend: { kind: 'seq', title: `Força de ${titleCase(c.name)}`, note: '% dos votos válidos em cada área', items: colors.map((color, i) => ({ color, count: counts[i], label: i === 0 ? `< ${fmtPct(breaks[0] ?? max, dg)}` : i === breaks.length ? `≥ ${fmtPct(breaks[i - 1], dg)}` : `${fmtPct(breaks[i - 1], dg)} – ${fmtPct(breaks[i], dg)}` })) } };
     }
     case 'duelo': {
       const [ia, ib] = o.duel ?? [];

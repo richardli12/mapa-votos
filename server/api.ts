@@ -9,11 +9,17 @@ import type { CargoId, Scope } from '../shared/types.ts';
 import { DemoProvider } from './demo/demo.ts';
 import type { Provider } from './provider.ts';
 import { LiveProvider } from './tse/live.ts';
+import { DemoUrnas } from './urna/demo.ts';
+import { LiveUrnas } from './urna/live.ts';
+import type { UrnasProvider } from './urna/provider.ts';
+import { nomesDosResultados } from './urna/resumo.ts';
 
 export const MODE = (process.env.AGORA_MODE ?? 'auto') as 'live' | 'demo' | 'auto';
 
 const demo = new DemoProvider();
 const live = MODE === 'demo' ? null : new LiveProvider();
+const demoUrnas = new DemoUrnas(demo);
+const liveUrnas = live ? new LiveUrnas(live) : null;
 
 /** No modo auto, testa a fonte ao vivo (com prazo curto) e cai para a simulação se ela não responder. */
 let liveOk: { ok: boolean; at: number } = { ok: false, at: 0 };
@@ -42,6 +48,19 @@ function parseScope(u: URL): Scope {
   return mu ? { level: 'mu', uf, mu } : uf ? { level: 'uf', uf } : { level: 'br' };
 }
 const parseT = (u: URL) => { const t = u.searchParams.get('t'); return t === null ? undefined : Number(t); };
+function parseMunicipio(u: URL): { uf: string; mu: string } {
+  const uf = u.searchParams.get('uf')?.toLowerCase() ?? '';
+  const mu = u.searchParams.get('mu') ?? '';
+  if (!UFS.some((x) => x.uf === uf) || !/^\d{5}$/.test(mu)) throw new HttpError(400, 'Informe a UF e o município (código TSE).');
+  return { uf, mu };
+}
+function parseNum(u: URL, k: string, required: boolean): number | null {
+  const v = u.searchParams.get(k);
+  if (v === null || v === '') { if (required) throw new HttpError(400, `Parâmetro ${k} obrigatório.`); return null; }
+  const n = Number(v);
+  if (!Number.isInteger(n) || n < 1 || n > 9999) throw new HttpError(400, `Parâmetro ${k} inválido.`);
+  return n;
+}
 const parseRound = (u: URL) => (u.searchParams.get('turno') === '2' ? 2 : 1);
 
 /**
@@ -74,6 +93,12 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, u: UR
     if (!res.headersSent) send(req, res, status, { erro: (e as Error).message });
     else res.end();
   }
+}
+
+function urnas(p: Provider): UrnasProvider {
+  if (p === demo) return demoUrnas;
+  if (!liveUrnas) throw new HttpError(503, 'Fonte de urnas indisponível.');
+  return liveUrnas;
 }
 
 async function route(req: IncomingMessage, res: ServerResponse, u: URL) {
@@ -117,10 +142,45 @@ async function route(req: IncomingMessage, res: ServerResponse, u: URL) {
       res.writeHead(200, { 'Content-Type': img.type, 'Cache-Control': 'public, max-age=86400, s-maxage=86400' });
       return res.end(img.body);
     }
+    case '/api/urnas/estrutura': {
+      const { uf, mu } = parseMunicipio(u);
+      return send(req, res, 200, await urnas(p).estrutura(uf, mu, round, t), isDemo ? 3600 : 1800);
+    }
+    case '/api/urnas/secoes': {
+      const { uf, mu } = parseMunicipio(u);
+      const focus = (u.searchParams.get('foco') ?? '').split(',').filter((x) => /^\d{1,5}$/.test(x)).slice(0, 8);
+      const zona = parseNum(u, 'zona', false);
+      if (zona === null) {
+        const est = await urnas(p).estrutura(uf, mu, round, t);
+        if (!est.municipioInteiro) throw new HttpError(400, `Este município tem ${est.totalSecoes} seções — escolha uma zona eleitoral.`);
+      }
+      const out = await urnas(p).secoes(parseCargo(u.searchParams.get('cargo')), uf, mu, zona, focus, round, t);
+      return send(req, res, 200, out, out.pending ? 2 : fresh);
+    }
+    case '/api/urnas/boletim': {
+      const { uf, mu } = parseMunicipio(u);
+      const b = await urnas(p).boletim(uf, mu, parseNum(u, 'zona', true)!, parseNum(u, 'secao', true)!, round, t);
+      if (b.cargos.length) {
+        // nomes, partidos, cores e fotos vêm dos resultados oficiais do município
+        const results = await Promise.all(CARGOS.map((c) => p.result(c.id, { level: 'mu', uf, mu }, round, t).catch(() => null)));
+        const nomes = nomesDosResultados(results.filter((r): r is NonNullable<typeof r> => !!r), uf);
+        for (const cargo of b.cargos) {
+          const n = nomes.get(cargo.codigo);
+          for (const v of cargo.votos) {
+            const c = v.tipo === 'nominal' ? n?.cands.get(v.numero) : undefined;
+            const part = n?.partidos.get(v.partido);
+            if (c) Object.assign(v, { nome: c.nome, sigla: c.sigla, id: c.id, cor: c.cor, foto: c.foto });
+            else if (v.tipo === 'legenda') Object.assign(v, { nome: `Legenda ${part?.sigla ?? v.numero}`, sigla: part?.sigla, cor: part?.cor ?? -1 });
+          }
+        }
+      }
+      // boletim totalizado não muda mais
+      return send(req, res, 200, b, b.status === 'totalizada' && !isDemo ? 86_400 : fresh);
+    }
     case '/api/saude': return send(req, res, 200, { ok: true, mode: MODE, provider: isDemo ? 'demo' : 'live' });
   }
   throw new HttpError(404, 'Rota não encontrada.');
 }
 
 /** Rotas expostas — o build da Vercel cria uma função para cada uma. */
-export const API_ROUTES = ['meta', 'municipios', 'resultado', 'mapa', 'progresso', 'foto', 'saude'];
+export const API_ROUTES = ['meta', 'municipios', 'resultado', 'mapa', 'progresso', 'foto', 'saude', 'urnas/estrutura', 'urnas/secoes', 'urnas/boletim'];

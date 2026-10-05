@@ -9,11 +9,12 @@
     "dev:api": "tsx watch server/index.ts",
     "dev:web": "vite",
     "build": "tsc --noEmit -p tsconfig.json && vite build",
-    "build:vercel": "npm run build && node scripts/build-vercel.mjs",
+    "build:vercel": "node scripts/build-locais.mjs --optional && npm run build && node scripts/build-vercel.mjs",
     "start": "NODE_ENV=production tsx server/index.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "geo": "node scripts/build-geo.mjs"
+    "geo": "node scripts/build-geo.mjs",
+    "locais": "node scripts/build-locais.mjs"
   },
   "engines": {
     "node": ">=20"
@@ -44,6 +45,7 @@
     "@vitejs/plugin-react": "^6.1.1",
     "concurrently": "^10.0.5",
     "esbuild": "^0.28.2",
+    "fflate": "^0.8.3",
     "mapshaper": "^0.7.74",
     "typescript": "^7.0.2",
     "vite": "^8.3.2",

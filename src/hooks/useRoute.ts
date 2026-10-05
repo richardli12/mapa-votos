@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { CargoId } from '../../shared/types';
 
-export type View = 'geral' | 'comparar' | 'partidos' | 'perfil';
+export type View = 'geral' | 'comparar' | 'partidos' | 'perfil' | 'urnas';
+export type UrnaMode = 'lider' | 'forca' | 'comparecimento' | 'apuracao';
 export type MapMode = 'lider' | 'partido' | 'forca' | 'duelo' | 'margem' | 'comparecimento' | 'brancosnulos' | 'apuracao';
 
 export interface Route {
@@ -17,10 +18,17 @@ export interface Route {
   turno: number;
   /** Brasil por município */
   det?: 'mu';
+  /** aba Urnas: zona eleitoral, local de votação (`zona-local`), seção e modo do mapa de escolas */
+  z?: number;
+  esc?: string;
+  s?: number;
+  um?: UrnaMode;
 }
 
 const CARGOS: CargoId[] = ['presidente', 'governador', 'senador', 'depfederal', 'depestadual'];
-const VIEWS: View[] = ['geral', 'comparar', 'partidos', 'perfil'];
+const VIEWS: View[] = ['geral', 'comparar', 'partidos', 'perfil', 'urnas'];
+const UMODES: UrnaMode[] = ['lider', 'forca', 'comparecimento', 'apuracao'];
+const int = (v: string | null) => (v && /^\d{1,4}$/.test(v) ? Number(v) : undefined);
 
 export function parseHash(hash: string): Route {
   const p = new URLSearchParams(hash.replace(/^#\/?/, ''));
@@ -34,6 +42,10 @@ export function parseHash(hash: string): Route {
     cand: p.get('cand') || undefined,
     turno: p.get('turno') === '2' ? 2 : 1,
     det: p.get('det') === 'mu' ? 'mu' : undefined,
+    z: int(p.get('z')),
+    esc: /^\d{1,4}-\d{1,4}$/.test(p.get('esc') ?? '') ? p.get('esc')! : undefined,
+    s: int(p.get('s')),
+    um: (UMODES as string[]).includes(p.get('um') ?? '') ? (p.get('um') as UrnaMode) : undefined,
   };
 }
 
@@ -48,6 +60,10 @@ export function toHash(r: Route): string {
   if (r.cand) p.set('cand', r.cand);
   if (r.turno !== 1) p.set('turno', '2');
   if (r.det && !r.uf) p.set('det', r.det);
+  if (r.mu && r.z) p.set('z', String(r.z));
+  if (r.mu && r.esc) p.set('esc', r.esc);
+  if (r.mu && r.s) p.set('s', String(r.s));
+  if (r.um && r.um !== 'lider') p.set('um', r.um);
   return `#/${p.toString()}`;
 }
 

@@ -7,14 +7,14 @@ import type { CargoId, CandidateLite, MapArea, MapPayload, MetaPayload, Municipa
 import { MUN_BY_CODE } from '../geo-index.ts';
 import { areaFromResult, type Provider } from '../provider.ts';
 import { normalizeProgress, normalizeResult } from './normalize.ts';
-import { Upstream, sourcesFromEnv, type Fetched } from './upstream.ts';
+import { BROWSER_UA, Upstream, sourcesFromEnv, type Fetched } from './upstream.ts';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Raw = Record<string, any>;
 const pad = (s: string | number, n: number) => String(s).padStart(n, '0');
 
-interface RoundCtx { round: number; pleito: string; date: string; elections: Raw[] }
-interface Ctx { cycle: string; dirs: Record<string, string>; rounds: RoundCtx[]; munis: Municipality[]; munByCode: Map<string, Municipality> }
+export interface RoundCtx { round: number; pleito: string; date: string; elections: Raw[] }
+export interface Ctx { cycle: string; dirs: Record<string, string>; rounds: RoundCtx[]; munis: Municipality[]; munByCode: Map<string, Municipality> }
 
 interface Stored { area: MapArea; top: Result['candidates']; many: boolean; updatedAt: string | null; source: SourceKind }
 interface Loader { items: string[]; done: Map<string, Stored>; tried: Set<string>; running: boolean; startedAt: number; touched: number; run?: Promise<void> }
@@ -35,7 +35,7 @@ export class LiveProvider implements Provider {
     this.mapWait = Number(env.AGORA_MAP_WAIT_MS ?? 4000);
   }
 
-  private async getAny(paths: string[], ttl: number): Promise<Fetched> {
+  async getAny(paths: string[], ttl: number): Promise<Fetched> {
     let err: unknown;
     for (const p of paths) {
       try { return await this.up.get(p, ttl); } catch (e) { err = e; }
@@ -43,7 +43,7 @@ export class LiveProvider implements Provider {
     throw err;
   }
 
-  private async context(): Promise<Ctx> {
+  async context(): Promise<Ctx> {
     if (this.ctx && Date.now() - this.ctx.at < 300_000) return this.ctx.value;
     if (!this.ctxTask) {
       this.ctxTask = this.loadContext().then((v) => { this.ctx = { value: v, at: Date.now() }; return v; })
@@ -87,7 +87,7 @@ export class LiveProvider implements Provider {
     return ctx;
   }
 
-  private roundCtx(ctx: Ctx, round: number): RoundCtx {
+  roundCtx(ctx: Ctx, round: number): RoundCtx {
     const r = ctx.rounds.find((x) => x.round === round) ?? ctx.rounds[0];
     if (!r) throw new Error('Nenhum turno disponível na configuração oficial.');
     return r;
@@ -99,9 +99,13 @@ export class LiveProvider implements Provider {
     return e ? String(e.cd) : null;
   }
 
-  private dir(ctx: Ctx, tp: string, ele: string, uf: string, pleito: string): string {
-    const tpl = ctx.dirs[tp] ?? (tp === 'ft' ? '<base>/<ambiente>/<ciclo>/<cd_eleicao>/fotos/<uf>' : tp === 'cm' ? '<base>/<ambiente>/<ciclo>/<cd_eleicao>/config' : '<base>/<ambiente>/<ciclo>/<cd_eleicao>/dados/<uf>');
-    const rep: Record<string, string> = { base: '', ambiente: 'oficial', ciclo: ctx.cycle, cd_eleicao: ele, cd_pleito: pleito, uf };
+  dir(ctx: Ctx, tp: string, ele: string, uf: string, pleito: string, extra: Record<string, string> = {}): string {
+    const DEFAULTS: Record<string, string> = {
+      ft: '<base>/<ambiente>/<ciclo>/<cd_eleicao>/fotos/<uf>', cm: '<base>/<ambiente>/<ciclo>/<cd_eleicao>/config',
+      cs: '<base>/<ambiente>/<ciclo>/arquivo-urna/<cd_pleito>/config/<uf>', aux: '<base>/<ambiente>/<ciclo>/arquivo-urna/<cd_pleito>/dados/<uf>/<municipio>/<zona>/<secao>',
+    };
+    const tpl = ctx.dirs[tp] ?? DEFAULTS[tp] ?? '<base>/<ambiente>/<ciclo>/<cd_eleicao>/dados/<uf>';
+    const rep: Record<string, string> = { base: '', ambiente: 'oficial', ciclo: ctx.cycle, cd_eleicao: ele, cd_pleito: pleito, uf, ...extra };
     return tpl.replace(/<([^>]+)>/g, (_, k) => rep[k] ?? '').replace(/\/$/, '');
   }
 
@@ -243,7 +247,7 @@ export class LiveProvider implements Provider {
     let out: { body: Buffer; type: string } | null = null;
     for (const s of this.up.sources) {
       try {
-        const res = await fetch(s.base + path, { signal: AbortSignal.timeout(8_000) });
+        const res = await fetch(s.base + path, { headers: { 'User-Agent': BROWSER_UA }, signal: AbortSignal.timeout(8_000) });
         if (res.ok) { out = { body: Buffer.from(await res.arrayBuffer()), type: res.headers.get('content-type') ?? 'image/jpeg' }; break; }
       } catch { /* próxima fonte */ }
     }
