@@ -151,4 +151,42 @@ describe('urnas ao vivo (fonte falsa com a árvore oficial)', () => {
     expect(b.hash).toBe('abc123');
     expect(b.cargos.find((c) => c.codigo === 3)!.votos[0]).toMatchObject({ numero: 92, qtd: 2 });
   });
+
+  it('ignora espelho que responde 200 com conteúdo que não é o arquivo e vai ao TSE', async () => {
+    const espelho = createServer((_req, res) => { res.writeHead(200, { 'content-type': 'text/html' }); res.end('<html>não encontrado</html>'); });
+    const lixo = createServer((_req, res) => { res.writeHead(200, { 'content-type': 'application/json' }); res.end('{"message":"not found"}'); });
+    await Promise.all([espelho, lixo].map((s) => new Promise<void>((r) => s.listen(0, '127.0.0.1', r))));
+    try {
+      for (const bp of [espelho, lixo]) {
+        const live = new LiveProvider({ AGORA_SOURCES: 'bp,tse', BP_API_URL: `http://127.0.0.1:${(bp.address() as AddressInfo).port}`, TSE_URL: base } as NodeJS.ProcessEnv);
+        // força o espelho na frente também para os arquivos de urna
+        const u = new LiveUrnas(live, { URNA_SOURCES: 'bp,tse' } as NodeJS.ProcessEnv);
+        const sec = await u.secoes('governador', 'ac', '01120', null, [], 1);
+        expect(sec.secoes.find((s) => s.s === 1)).toMatchObject({ st: 'totalizada', v: { 92: 2 } });
+        expect(sec.falhas).toBeUndefined();
+      }
+    } finally { espelho.close(); lixo.close(); }
+  });
+
+  it('acesso recusado pelo TSE vira falha com motivo, não seção zerada em silêncio', async () => {
+    const bloqueio = createServer((req, res) => {
+      if (req.url!.includes('/dados/')) { res.writeHead(403); res.end(); return; }
+      const body = req.url!.endsWith('ele-c.json') ? cfg : req.url!.endsWith('-cs.json') ? cs : null;
+      res.writeHead(body ? 200 : 404, { 'content-type': 'application/json' });
+      res.end(body ? JSON.stringify(body) : '');
+    });
+    await new Promise<void>((r) => bloqueio.listen(0, '127.0.0.1', r));
+    try {
+      const live = new LiveProvider({ AGORA_SOURCES: 'tse', TSE_URL: `http://127.0.0.1:${(bloqueio.address() as AddressInfo).port}` } as NodeJS.ProcessEnv);
+      const u = new LiveUrnas(live, {} as NodeJS.ProcessEnv);
+      const sec = await u.secoes('governador', 'ac', '01120', null, [], 1);
+      expect(sec.falhas).toBe(2);
+      expect(sec.aviso).toMatch(/403/);
+      const loc = await u.locais('governador', 'ac', '01120', null, [], 1);
+      expect(loc.falhas).toBe(2);
+      const d = await u.diagnostico('ac', '01120', 8, 1, 1);
+      expect(d.ok).toBe(false);
+      expect(d.passos.some((p) => p.status === 403)).toBe(true);
+    } finally { bloqueio.close(); }
+  });
 });

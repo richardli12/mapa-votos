@@ -67,6 +67,10 @@ export interface SecoesPayload {
   pending: number;
   total: number;
   source: SourceKind;
+  /** seções cujo boletim não pôde ser lido agora (fonte fora do ar, bloqueio, arquivo inválido) */
+  falhas?: number;
+  /** motivo da última falha, para exibir na tela */
+  aviso?: string;
 }
 
 export interface BoletimVoto {
@@ -146,4 +150,8 @@ export interface LocaisPayload {
   pending: number;
   total: number;
   source: import('./types').SourceKind;
+  /** seções cujo boletim não pôde ser lido agora (fonte fora do ar, bloqueio, arquivo inválido) */
+  falhas?: number;
+  /** motivo da última falha, para exibir na tela */
+  aviso?: string;
 }

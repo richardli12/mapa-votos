@@ -49,9 +49,9 @@ export function resumoPins(pins: PinData[]) {
 }
 
 /** Barra: candidato em foco + interruptor dos locais de votação. */
-export function PinBar({ on, cand, cands, estado, pins, filtro, setFiltro, zonas, zona }: {
+export function PinBar({ on, cand, cands, estado, pins, filtro, setFiltro, zonas, zona, aviso }: {
   on: boolean; cand?: CandidateLite; cands: CandidateLite[]; estado: PinsEstado; pins: PinData[];
-  filtro: PinFiltro; setFiltro: (f: PinFiltro) => void; zonas: number[]; zona: number | null;
+  filtro: PinFiltro; setFiltro: (f: PinFiltro) => void; zonas: number[]; zona: number | null; aviso?: string;
 }) {
   const { go, route } = useApp();
   const r = resumoPins(pins);
@@ -87,6 +87,7 @@ export function PinBar({ on, cand, cands, estado, pins, filtro, setFiltro, zonas
       {on && estado === 'carregando' && <span className="pin-hint"><span className="spinner" /> Buscando os locais de votação…</span>}
       {on && estado === 'sem-coordenadas' && <span className="pin-hint">Sem coordenadas dos locais deste município (gere o cadastro com <code>npm run locais</code>). Veja-os na aba Urnas.</span>}
       {on && estado === 'erro' && <span className="pin-hint erro">Não foi possível carregar os locais agora.</span>}
+      {on && estado === 'ok' && aviso && <span className="pin-hint erro">⚠ {aviso}</span>}
     </div>
   );
 }

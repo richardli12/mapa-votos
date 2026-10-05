@@ -123,7 +123,7 @@ Os boletins de urna ficam na área `arquivo-urna` da divulgação oficial:
 
 O boletim é decodificado no próprio servidor (`server/urna/bu.ts`, sem dependências), conforme a especificação ASN.1 oficial do TSE — o decodificador foi conferido campo a campo contra a ferramenta de referência nos boletins de exemplo publicados pelo TSE. Cada boletim tem todos os cargos da seção; uma vez publicado não muda, então fica em cache permanente.
 
-Cada seção é um arquivo, então a soma é feita por **zona eleitoral** e, em municípios com até `URNA_MAX_SECOES` seções (1.200), também para o município inteiro. Os boletins são lidos aos poucos, respeitando o limite de requisições do TSE.
+Cada seção é um arquivo, então a soma é feita por **zona eleitoral** e, em municípios com até `URNA_MAX_SECOES` seções (1.200), também para o município inteiro. Os boletins são lidos aos poucos, respeitando o limite de requisições do TSE. Boletins que a fonte recusar (ex.: HTTP 403) aparecem como falha, com o motivo na tela, e são tentados de novo automaticamente.
 
 **Nomes e endereços das escolas:** os arquivos de urna só trazem o *número* do local de votação. Nome, endereço, bairro e coordenadas vêm do conjunto "Eleitorado — locais de votação" dos dados abertos do TSE. O `npm run build:vercel` tenta baixá-lo e gerar `public/locais/<uf>/<município>.json` (comando avulso: `npm run locais`; outro endereço: `LOCAIS_URL=...`; arquivo local: `LOCAIS_FILE=...`). Se não conseguir, o build segue e a tela mostra os locais pelo número, num mosaico por zona em vez do mapa.
 
@@ -141,6 +141,8 @@ Cada seção é um arquivo, então a soma é feita por **zona eleitoral** e, em 
 | `AGORA_CONCURRENCY` | `6` | Requisições simultâneas à fonte (o TSE bloqueia excesso) |
 | `AGORA_MAP_WAIT_MS` | `4000` | Quanto a consulta do mapa (ou das seções) espera a primeira carga |
 | `URNA_MAX_SECOES` | `1200` | Até quantas seções a aba Urnas soma o município inteiro (acima disso, por zona) |
+| `URNA_SOURCES` | `tse,bp` | Ordem das fontes para os arquivos de urna (índices e boletins `.bu`), publicados originalmente pelo TSE |
+| `URNA_CONCURRENCY` | `12` | Boletins baixados em paralelo |
 | `LOCAIS_URL` / `LOCAIS_FILE` | dados abertos do TSE 2026 | Origem do cadastro de locais de votação usado no build |
 | `RADAR_LOCAIS` | — | `0` desliga o download dos locais no build |
 | `STRICT_SIGNATURE` | — | `1` recusa arquivos do TSE com assinatura inválida |
@@ -164,6 +166,7 @@ Todas as respostas são JSON normalizado (o mesmo formato para BP, TSE e simula�
 | `GET /api/urnas/secoes` | `cargo`, `uf`, `mu`, `zona?`, `foco?` | resumo de cada seção para o cargo |
 | `GET /api/urnas/locais` | `cargo`, `uf`, `mu`, `zona?`, `foco?` | seções somadas por local de votação (pins do mapa), com a posição do candidato em foco |
 | `GET /api/urnas/boletim` | `uf`, `mu`, `zona`, `secao` | boletim de urna completo da seção (todos os cargos) |
+| `GET /api/urnas/diagnostico` | `uf`, `mu`, `zona?`, `secao?` | passo a passo (URLs e status HTTP de cada fonte, sem cache) da leitura de um boletim — use quando as seções aparecerem zeradas |
 
 `cargo` ∈ `presidente`, `governador`, `senador`, `depfederal`, `depestadual`. `mu` é o código TSE de 5 dígitos. Na simulação, `t` (0–1) posiciona a máquina do tempo.
 

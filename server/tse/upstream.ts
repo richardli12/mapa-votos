@@ -74,7 +74,7 @@ export class Upstream {
   }
 
   /** Busca um caminho (ex.: /oficial/ele2026/6257/dados/br/br-c0001-e006257-u.jws) com cache e fallback entre fontes. */
-  get(path: string, ttlMs = 15_000): Promise<Fetched> {
+  get(path: string, ttlMs = 15_000, validate?: (v: unknown) => boolean): Promise<Fetched> {
     const hit = this.cache.get(path);
     if (hit && hit.expires > Date.now()) return Promise.resolve(hit);
     const cool = this.cooldown.get(path);
@@ -84,7 +84,7 @@ export class Upstream {
     }
     const pending = this.inflight.get(path);
     if (pending) return pending;
-    const task = this.slot(() => this.fetchAll(path, ttlMs, hit)).finally(() => this.inflight.delete(path));
+    const task = this.slot(() => this.fetchAll(path, ttlMs, hit, validate)).finally(() => this.inflight.delete(path));
     this.inflight.set(path, task);
     return task;
   }
@@ -93,15 +93,19 @@ export class Upstream {
   /**
    * Arquivo binário imutável (ex.: boletim de urna .bu, cujo caminho inclui o hash do arquivo).
    * Fica em cache sem prazo; `null` quando nenhuma fonte tem o arquivo.
+   * `validate` descarta respostas 200 que não são o arquivo (ex.: página de erro de um espelho).
    */
-  getBinary(path: string): Promise<Uint8Array | null> {
+  getBinary(path: string, validate?: (b: Uint8Array) => boolean): Promise<Uint8Array | null> {
     let p = this.bins.get(path);
     if (!p) {
       p = this.slot(async () => {
         for (const src of this.sources) {
           try {
             const res = await fetch(src.base + path, { headers: { 'User-Agent': BROWSER_UA, Accept: '*/*' }, signal: AbortSignal.timeout(10_000) });
-            if (res.ok) return new Uint8Array(await res.arrayBuffer());
+            if (res.ok) {
+              const b = new Uint8Array(await res.arrayBuffer());
+              if (!validate || validate(b)) return b;
+            }
           } catch { /* próxima fonte */ }
         }
         return null;
@@ -113,7 +117,7 @@ export class Upstream {
     return p;
   }
 
-  private async fetchAll(path: string, ttlMs: number, hit?: Entry): Promise<Fetched> {
+  private async fetchAll(path: string, ttlMs: number, hit?: Entry, validate?: (v: unknown) => boolean): Promise<Fetched> {
     let lastStatus = 0;
     for (let i = 0; i < this.sources.length; i++) {
       const down = this.sourceDown.get(i);
@@ -133,6 +137,8 @@ export class Upstream {
           continue;
         }
         const decoded = decodePayload(await res.text());
+        // resposta 200 que não é o arquivo esperado: tenta a próxima fonte
+        if (validate && !validate(decoded.value)) { lastStatus = 422; continue; }
         if (this.strict && src.kind === 'tse' && decoded.verified === false) throw new Error('Assinatura TSE inválida.');
         const entry: Entry = { ...decoded, source: src.kind, expires: Date.now() + ttlMs, etag: res.headers.get('etag'), modified: res.headers.get('last-modified'), sourceIndex: i };
         this.cache.set(path, entry);

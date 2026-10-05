@@ -48,8 +48,9 @@ function UrnasMunicipio({ uf, mu, nome }: { uf: string; mu: string; nome: string
   const foco = route.fc && prop ? [result.data?.candidates.find((c) => c.id === route.fc)?.number].filter((x): x is string => !!x) : [];
   const sec = usePoll<SecoesPayload>(e ? urls.urnasSecoes(q, zona, foco) : null, refresh);
   useEffect(() => {
-    if (!sec.data?.pending) return;
-    const id = window.setTimeout(sec.refresh, 2500);
+    if (!sec.data?.pending && !sec.data?.falhas) return;
+    // carga em andamento: acompanha de perto; falhas de acesso: tenta de novo com calma
+    const id = window.setTimeout(sec.refresh, sec.data.pending ? 2500 : 10_000);
     return () => window.clearTimeout(id);
   }, [sec.data, sec.refresh]);
   const payload = sec.data && sec.data.mu === mu && sec.data.zona === zona && sec.data.cargo === route.cargo ? sec.data : null;
@@ -129,6 +130,14 @@ function UrnasMunicipio({ uf, mu, nome }: { uf: string; mu: string; nome: string
         </div>
         {!e.municipioInteiro && <p className="urna-aviso">Município grande: a soma é feita por zona eleitoral ({fmtInt(e.totalSecoes)} boletins no total). O resultado oficial do município inteiro está na visão geral.</p>}
         {payload && payload.pending > 0 && <div className="urna-carga"><span className="spinner" /> lendo boletins: {fmtInt(payload.total - payload.pending)} de {fmtInt(payload.total)}<span className="urna-carga-bar"><span style={{ width: `${((payload.total - payload.pending) / payload.total) * 100}%` }} /></span></div>}
+        {payload && !!payload.falhas && (
+          <p className="urna-aviso erro">
+            ⚠ {fmtInt(payload.falhas)} de {fmtInt(payload.total)} boletins não puderam ser lidos agora{payload.aviso ? `: ${payload.aviso}` : ''}. O sistema tenta de novo automaticamente.
+          </p>
+        )}
+        {payload && !payload.pending && !payload.falhas && payload.total > 0 && secoes.every((x) => x.st !== 'totalizada') && (
+          <p className="urna-aviso">Nenhum boletim desta {zona === null ? 'cidade' : 'zona'} foi publicado ainda pelo TSE — eles aparecem aqui conforme as urnas são totalizadas.</p>
+        )}
         {sec.error && <p className="urna-aviso erro">{sec.error}</p>}
       </Card>
 

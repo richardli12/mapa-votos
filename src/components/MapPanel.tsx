@@ -102,7 +102,8 @@ export function MapPanel({ compact }: { compact?: boolean }) {
       )}
       {(route.uf || pinsOn) && (
         <PinBar on={pinsOn} cand={focoCand} cands={candLista} estado={pinsData.estado} pins={pinsData.pins} filtro={filtro} setFiltro={setFiltro}
-          zonas={pinsData.estrutura?.zonas.map((z) => z.zona) ?? []} zona={pinsData.zona} />
+          zonas={pinsData.estrutura?.zonas.map((z) => z.zona) ?? []} zona={pinsData.zona}
+          aviso={pinsData.payload?.falhas ? `${fmtInt(pinsData.payload.falhas)} boletins não puderam ser lidos agora${pinsData.payload.aviso ? ` (${pinsData.payload.aviso})` : ''} — tentando de novo.` : undefined} />
       )}
       <MapView geoKey={geoKey} fill={coloring.fill} emptyColor={palette.empty} selected={route.mu ?? undefined}
         labels={geoKey === 'uf' && !comPins} onPick={pick} renderTip={tip}

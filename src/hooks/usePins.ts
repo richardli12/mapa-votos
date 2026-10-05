@@ -32,8 +32,8 @@ export function usePins(on: boolean, foco: CandidateLite | undefined) {
   const zona = !e ? null : isDemo || e.municipioInteiro ? (route.z ?? null) : route.z ?? e.zonas[0]?.zona ?? null;
   const loc = usePoll<LocaisPayload>(ativo && e ? urls.urnasLocais(q, zona, foco ? [foco.number] : []) : null, refresh);
   useEffect(() => {
-    if (!loc.data?.pending) return;
-    const id = window.setTimeout(loc.refresh, 2500);
+    if (!loc.data?.pending && !loc.data?.falhas) return;
+    const id = window.setTimeout(loc.refresh, loc.data.pending ? 2500 : 10_000);
     return () => window.clearTimeout(id);
   }, [loc.data, loc.refresh]);
   const payload = loc.data && loc.data.mu === route.mu && loc.data.cargo === route.cargo ? loc.data : null;

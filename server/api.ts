@@ -155,7 +155,7 @@ async function route(req: IncomingMessage, res: ServerResponse, u: URL) {
         if (!est.municipioInteiro) throw new HttpError(400, `Este município tem ${est.totalSecoes} seções — escolha uma zona eleitoral.`);
       }
       const out = await urnas(p).secoes(parseCargo(u.searchParams.get('cargo')), uf, mu, zona, focus, round, t);
-      return send(req, res, 200, out, out.pending ? 2 : fresh);
+      return send(req, res, 200, out, out.pending ? 2 : out.falhas ? 5 : fresh);
     }
     case '/api/urnas/locais': {
       const { uf, mu } = parseMunicipio(u);
@@ -166,7 +166,20 @@ async function route(req: IncomingMessage, res: ServerResponse, u: URL) {
         if (!est.municipioInteiro) throw new HttpError(400, `Este município tem ${est.totalSecoes} seções — escolha uma zona eleitoral.`);
       }
       const out = await urnas(p).locais(parseCargo(u.searchParams.get('cargo')), uf, mu, zona, focus, round, t);
-      return send(req, res, 200, out, out.pending ? 2 : fresh);
+      return send(req, res, 200, out, out.pending ? 2 : out.falhas ? 5 : fresh);
+    }
+    case '/api/urnas/diagnostico': {
+      // Passo a passo de uma seção nas fontes ao vivo (sem cache), para investigar boletins que não aparecem.
+      const { uf, mu } = parseMunicipio(u);
+      if (!liveUrnas) throw new HttpError(400, 'Diagnóstico disponível só no modo ao vivo.');
+      const zona = parseNum(u, 'zona', false), secao = parseNum(u, 'secao', false);
+      let z = zona, s = secao;
+      if (z === null || s === null) {
+        const est = await liveUrnas.estrutura(uf, mu, round);
+        const zz = est.zonas.find((x) => z === null || x.zona === z) ?? est.zonas[0];
+        z = zz.zona; s = s ?? zz.secoes[0].s;
+      }
+      return send(req, res, 200, await liveUrnas.diagnostico(uf, mu, z, s!, round), 0);
     }
     case '/api/urnas/boletim': {
       const { uf, mu } = parseMunicipio(u);
@@ -194,4 +207,4 @@ async function route(req: IncomingMessage, res: ServerResponse, u: URL) {
 }
 
 /** Rotas expostas — o build da Vercel cria uma função para cada uma. */
-export const API_ROUTES = ['meta', 'municipios', 'resultado', 'mapa', 'progresso', 'foto', 'saude', 'urnas/estrutura', 'urnas/secoes', 'urnas/locais', 'urnas/boletim'];
+export const API_ROUTES = ['meta', 'municipios', 'resultado', 'mapa', 'progresso', 'foto', 'saude', 'urnas/estrutura', 'urnas/secoes', 'urnas/locais', 'urnas/boletim', 'urnas/diagnostico'];

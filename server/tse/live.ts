@@ -35,10 +35,12 @@ export class LiveProvider implements Provider {
     this.mapWait = Number(env.AGORA_MAP_WAIT_MS ?? 4000);
   }
 
-  async getAny(paths: string[], ttl: number): Promise<Fetched> {
+  /** Primeiro caminho que responder; `validate` recusa respostas 200 que não são o arquivo esperado. */
+  async getAny(paths: string[], ttl: number, validate?: (v: Raw) => boolean): Promise<Fetched> {
     let err: unknown;
+    const ok = validate && ((v: unknown) => !!v && typeof v === 'object' && validate(v as Raw));
     for (const p of paths) {
-      try { return await this.up.get(p, ttl); } catch (e) { err = e; }
+      try { return await this.up.get(p, ttl, ok); } catch (e) { err = e; }
     }
     throw err;
   }
@@ -53,7 +55,7 @@ export class LiveProvider implements Provider {
   }
 
   private async loadContext(): Promise<Ctx> {
-    const cfg = (await this.getAny(['/oficial/comum/config/ele-c.jws', '/oficial/comum/config/ele-c.json'], 300_000)).value as Raw;
+    const cfg = (await this.getAny(['/oficial/comum/config/ele-c.jws', '/oficial/comum/config/ele-c.json'], 300_000, (v) => Array.isArray(v.pl))).value as Raw;
     const dirs: Record<string, string> = Object.fromEntries((cfg.arq ?? []).map((a: Raw) => [a.tp, String(a.dir)]));
     const pleitos = (cfg.pl ?? []).filter((p: Raw) => p.c === this.cycle);
     if (!pleitos.length) throw new Error(`Ciclo ${this.cycle} não encontrado na configuração oficial.`);
@@ -72,7 +74,7 @@ export class LiveProvider implements Provider {
     if (stateEle) {
       try {
         const cmBase = `${this.dir(ctx, 'cm', stateEle, 'br', first.pleito)}/mun-e${pad(stateEle, 6)}-cm`;
-        const cm = (await this.getAny([`${cmBase}.jws`, `${cmBase}.json`], 3_600_000)).value as Raw;
+        const cm = (await this.getAny([`${cmBase}.jws`, `${cmBase}.json`], 3_600_000, (v) => Array.isArray(v.abr))).value as Raw;
         for (const a of cm.abr ?? []) {
           for (const m of a.mu ?? []) {
             const code = pad(m.cd, 5), known = MUN_BY_CODE.get(code);
@@ -149,7 +151,7 @@ export class LiveProvider implements Provider {
     const file = `${dirUf}${scope.level === 'mu' ? scope.mu : ''}-c${pad(cargoCode(cargo, uf), 4)}-e${pad(ele, 6)}-u`;
     const base = this.dir(ctx, 'u', ele, dirUf, r.pleito);
     const ttl = scope.level === 'mu' ? 45_000 : 15_000;
-    const got = await this.getAny([`${base}/${file}.jws`, `${base}/${file}.json`], ttl);
+    const got = await this.getAny([`${base}/${file}.jws`, `${base}/${file}.json`], ttl, (v) => Array.isArray(v.carg));
     const photoDir = this.dir(ctx, 'ft', ele, cargo === 'presidente' ? 'br' : dirUf, r.pleito);
     return normalizeResult(got.value as Raw, {
       scope, scopeName: this.scopeName(ctx, scope), source: got.source as SourceKind, verified: got.verified, round: r.round,
@@ -236,7 +238,7 @@ export class LiveProvider implements Provider {
     const ele = this.electionFor(r, 'presidente');
     if (!ele) return [];
     const base = this.dir(ctx, 'ab', ele, 'br', r.pleito);
-    const got = await this.getAny([`${base}/br-e${pad(ele, 6)}-ab.jws`, `${base}/br-e${pad(ele, 6)}-ab.json`], 15_000);
+    const got = await this.getAny([`${base}/br-e${pad(ele, 6)}-ab.jws`, `${base}/br-e${pad(ele, 6)}-ab.json`], 15_000, (v) => Array.isArray(v.abr));
     return normalizeProgress(got.value as Raw);
   }
 

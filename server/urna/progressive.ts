@@ -1,5 +1,7 @@
 // Carga progressiva de muitos arquivos pequenos (ex.: um boletim por seção), com concorrência limitada.
-// Cada consulta espera a carga avançar por até `waitMs` (funciona em serverless) e devolve o que já chegou.
+// Cada consulta espera a carga avançar por até `waitMs` (funciona em serverless) e devolve o que já chegou;
+// na Vercel a carga continua depois da resposta (waitUntil), dentro do tempo máximo da função.
+import { emSegundoPlano } from '../runtime.ts';
 interface Run<T> { items: string[]; done: Map<string, T>; tried: Set<string>; running: boolean; startedAt: number; touched: number; run?: Promise<void> }
 
 export class Progressive<T> {
@@ -22,6 +24,7 @@ export class Progressive<T> {
         }
       };
       run.run = Promise.all(Array.from({ length: this.concurrency }, worker)).then(() => undefined).finally(() => { run.running = false; run.run = undefined; });
+      emSegundoPlano(run.run);
     }
     if (r.run && this.waitMs > 0 && r.tried.size < r.items.length) {
       let timer: ReturnType<typeof setTimeout> | undefined;
