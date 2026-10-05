@@ -3,7 +3,7 @@ import { fmtInt, fmtPct, titleCase } from '../../shared/format';
 import { totalOf } from '../lib/mapcolor';
 import { useApp } from '../state';
 import { slotColor } from '../lib/palette';
-import type { Relatorio } from '../lib/relatorio';
+import type { CapaCandidato, Relatorio } from '../lib/relatorio';
 import { Exportar } from './Exportar';
 import { Avatar, Bar, Seg, slotVar, StatusBadge } from './ui';
 
@@ -47,6 +47,42 @@ export function CandidateDrawer() {
   const position = c && r ? r.candidates.indexOf(c) + 1 : null;
   const unit = route.uf ? 'municípios' : 'estados';
   const ag = age(c?.birth);
+
+  /** Capa do PDF: foto, identificação, números e mapa de força com o % do candidato em cada área. */
+  const capaPdf = (): CapaCandidato | undefined => {
+    if (!areas) return undefined;
+    const comVotos = areas.list.filter((a) => a.v > 0);
+    const melhor = [...comVotos].sort((a, b) => b.pct - a.pct)[0];
+    const maisVotos = [...comVotos].sort((a, b) => b.v - a.v)[0];
+    return {
+      pessoa: { nome: titleCase(name), foto: c?.photo ?? lite?.photo, cor: slotColor(palette, c?.color ?? lite?.color ?? -1) },
+      numero: c?.number ?? lite?.number ?? '',
+      partido: c?.party ?? lite?.party ?? '',
+      partidoNome: c?.partyName,
+      nomeCompleto: c ? `${titleCase(c.fullName)}${ag ? ` · ${ag} anos` : ''}` : undefined,
+      coligacao: c?.coalition ? `${c.coalitionParties ? 'Coligação' : 'Federação'}: ${c.coalition}${c.coalitionParties ? ` (${c.coalitionParties})` : ''}` : c?.federation ? `Federação: ${c.federation}` : undefined,
+      chapa: c?.runningMates.map((m) => `${ROLE[m.role] ?? 'Chapa'}: ${titleCase(m.name)} (${m.party})`),
+      situacao: c?.status || (c?.projected ? 'Projeção' : undefined),
+      kpis: [
+        ...(c && r ? [
+          { label: 'Votos', valor: fmtInt(c.votes) },
+          { label: '% dos válidos', valor: fmtPct(c.pct, 2) },
+          { label: 'Posição', valor: `${position}º`, sub: `de ${fmtInt(r.candidates.length)} candidatos` },
+        ] : []),
+        { label: `${unit} com votos`, valor: fmtInt(areas.comVotos), sub: `de ${fmtInt(areas.list.length)}` },
+        { label: 'Lidera em', valor: fmtInt(areas.led), sub: unit },
+      ],
+      destaques: [
+        ...(maisVotos ? [{ label: 'Mais votos', valor: `${maisVotos.name} (${fmtInt(maisVotos.v)})` }] : []),
+        ...(melhor ? [{ label: 'Melhor desempenho', valor: `${melhor.name} (${fmtPct(melhor.pct, 1)})` }] : []),
+      ],
+      mapa: {
+        geoKey: route.uf ?? (route.det === 'mu' ? 'br-mun' : 'uf'),
+        valores: Object.fromEntries(areas.list.map((a) => [a.k, a.pct])),
+        titulo: `Mapa de força — % dos válidos por ${route.uf ? 'município' : 'estado'}`,
+      },
+    };
+  };
 
   return (
     <>
@@ -94,14 +130,8 @@ export function CandidateDrawer() {
               <AreaRanking rows={areas.list} comVotos={areas.comVotos} unit={unit} pending={areas.pending} total={areas.total}
                 relatorio={{
                   arquivo: `${name}-${route.cargo}-${route.uf ?? 'br'}`,
-                  titulo: `${titleCase(name)} (${c?.party ?? lite?.party ?? ''} ${c?.number ?? lite?.number ?? ''}) — votos por ${route.uf ? 'município' : 'estado'}`,
-                  cor: slotColor(palette, c?.color ?? lite?.color ?? -1),
-                  resumo: [
-                    ...(c && r ? [{ label: 'Votos', valor: fmtInt(c.votes) }, { label: '% dos válidos', valor: fmtPct(c.pct, 2) }, { label: 'Posição', valor: `${position}º de ${r.candidates.length}` }] : []),
-                    { label: `${unit} com votos`, valor: `${fmtInt(areas.comVotos)} de ${fmtInt(areas.list.length)}` },
-                    { label: 'Lidera em', valor: `${fmtInt(areas.led)} ${unit}` },
-                    ...(c?.status ? [{ label: 'Situação', valor: c.status }] : []),
-                  ],
+                  titulo: `Ficha do candidato — votos por ${route.uf ? 'município' : 'estado'}`,
+                  capa: capaPdf(),
                 }}
                 onPick={(k) => go(route.uf ? { mu: k } : { uf: k })} />
             ) : map.loading || map.stale ? <div className="drawer-loading"><span className="spinner" /> Carregando os votos de {titleCase(name)} em cada {route.uf ? 'município' : 'estado'}…</div> : null}

@@ -5,10 +5,36 @@ export type Celula = string | number | null | undefined;
 
 export interface ColunaRel {
   titulo: string;
-  /** int: 1.234 · pct: 12,34% · num: decimal livre · cod: número sem separador (zona, seção, local) · texto (padrão) */
-  tipo?: 'texto' | 'int' | 'pct' | 'num' | 'cod';
+  /** int: 1.234 · pct: 12,34% · num: decimal livre · cod: número sem separador (zona, seção, local) · texto (padrão)
+   *  foto: miniatura redonda da pessoa da linha (`Relatorio.pessoas`), só no PDF */
+  tipo?: 'texto' | 'int' | 'pct' | 'num' | 'cod' | 'foto';
   /** no PDF, desenha uma barra proporcional ao valor (colunas numéricas) */
   barra?: boolean;
+}
+
+/** Pessoa com foto (ou iniciais na cor do partido, quando não há foto). */
+export interface Pessoa { nome: string; foto?: string | null; cor?: string }
+
+/** Mapa de força para a capa: % do candidato em cada área, desenhado em vetor no PDF. */
+export interface MapaRel {
+  geoKey: string;
+  valores: Record<string, number | null>;
+  titulo: string;
+}
+
+/** Capa da ficha do candidato: foto grande, identificação, números e mapa. */
+export interface CapaCandidato {
+  pessoa: Pessoa;
+  numero: string;
+  partido: string;
+  partidoNome?: string;
+  nomeCompleto?: string;
+  coligacao?: string;
+  situacao?: string;
+  chapa?: string[];
+  kpis: { label: string; valor: string; sub?: string }[];
+  destaques?: { label: string; valor: string }[];
+  mapa?: MapaRel;
 }
 
 export interface Relatorio {
@@ -17,7 +43,10 @@ export interface Relatorio {
   titulo: string;
   /** linha de contexto extra (abaixo do cargo/local) */
   subtitulo?: string;
-  resumo?: { label: string; valor: string }[];
+  resumo?: { label: string; valor: string; pessoa?: Pessoa }[];
+  /** pessoa de cada linha (colunas do tipo foto) */
+  pessoas?: (Pessoa | null)[];
+  capa?: CapaCandidato;
   colunas: ColunaRel[];
   linhas: Celula[][];
   /** cor das barras no PDF (hex) */
@@ -52,7 +81,8 @@ export function linhasCsv(rel: Relatorio): (string | number)[][] {
     if (typeof v === 'number') return tipo === 'int' ? Math.round(v) : String(Number(v.toFixed(4))).replace('.', ',');
     return v;
   };
-  return [rel.colunas.map((c) => c.titulo), ...rel.linhas.map((l) => rel.colunas.map((c, i) => cel(l[i], c.tipo)))];
+  const cols = rel.colunas.map((c, i) => [c, i] as const).filter(([c]) => c.tipo !== 'foto');
+  return [cols.map(([c]) => c.titulo), ...rel.linhas.map((l) => cols.map(([c, i]) => cel(l[i], c.tipo)))];
 }
 
 export function nomeArquivo(s: string): string {

@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { cargoInfo, cargoLabel } from '../../shared/cargos';
 import { fmtInt, fmtPct, normalizeText, titleCase } from '../../shared/format';
 import type { Candidate, Result } from '../../shared/types';
+import { slotColor } from '../lib/palette';
 import { useApp } from '../state';
 import { Exportar } from './Exportar';
 import { Avatar, Bar, Card, Empty, Seg, slotVar, StatusBadge } from './ui';
@@ -40,7 +41,7 @@ export function LeaderCards({ r }: { r: Result }) {
 type StatusFilter = 'todos' | 'eleitos' | 'segundo' | 'projecao';
 
 export function CandidateList({ r, limitDefault = 40 }: { r: Result; limitDefault?: number }) {
-  const { go, route } = useApp();
+  const { go, route, palette } = useApp();
   const [q, setQ] = useState('');
   const [party, setParty] = useState('');
   const [st, setSt] = useState<StatusFilter>('todos');
@@ -84,8 +85,9 @@ export function CandidateList({ r, limitDefault = 40 }: { r: Result; limitDefaul
           { label: 'Brancos', valor: fmtPct(r.totals.blankPct, 2) },
           { label: 'Nulos', valor: fmtPct(r.totals.nullPct, 2) },
         ],
-        colunas: [{ titulo: 'Pos.', tipo: 'int' }, { titulo: 'Número' }, { titulo: 'Nome' }, { titulo: 'Partido' }, { titulo: 'Coligação / Federação' }, { titulo: 'Votos', tipo: 'int' }, { titulo: '% válidos', tipo: 'pct', barra: true }, { titulo: 'Situação' }],
-        linhas: r.candidates.map((c, i) => [i + 1, c.number, titleCase(c.name), c.party, c.coalition ?? c.federation ?? '', c.votes, c.pct, c.status || (c.projected ? 'Projeção' : '')]),
+        colunas: [{ titulo: 'Pos.', tipo: 'int' }, { titulo: '', tipo: 'foto' }, { titulo: 'Número' }, { titulo: 'Nome' }, { titulo: 'Partido' }, { titulo: 'Coligação / Federação' }, { titulo: 'Votos', tipo: 'int' }, { titulo: '% válidos', tipo: 'pct', barra: true }, { titulo: 'Situação' }],
+        pessoas: r.candidates.map((c) => ({ nome: titleCase(c.name), foto: c.photo, cor: slotColor(palette, c.color) })),
+        linhas: r.candidates.map((c, i) => [i + 1, null, c.number, titleCase(c.name), c.party, c.coalition ?? c.federation ?? '', c.votes, c.pct, c.status || (c.projected ? 'Projeção' : '')]),
       })} />}>
       <div className="filters">
         <input className="input" placeholder="Nome ou número…" value={q} onChange={(e) => { setQ(e.target.value); setLimit(limitDefault); }} aria-label="Filtrar candidatos" />

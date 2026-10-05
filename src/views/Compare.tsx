@@ -4,6 +4,7 @@ import { MapView } from '../components/MapView';
 import { Exportar } from '../components/Exportar';
 import { Avatar, Card, Empty, slotVar, StatusBadge } from '../components/ui';
 import { colorAreas, totalOf } from '../lib/mapcolor';
+import { slotColor } from '../lib/palette';
 import { useApp } from '../state';
 
 export function CompareView() {
@@ -90,7 +91,8 @@ export function CompareView() {
         actions={<Exportar montar={() => ({
           arquivo: `comparativo-${route.cargo}-${route.uf ?? 'br'}`,
           titulo: `Comparativo: ${chosen.map((c) => titleCase(c.name)).join(' × ')}`,
-          resumo: chosen.map((c) => ({ label: `${titleCase(c.name)} (${c.party})`, valor: `${fmtPct(c.pct, 2)} · vence em ${fmtInt(wins.get(c.id) ?? 0)}` })),
+          resumo: chosen.map((c) => ({ label: `${titleCase(c.name)} (${c.party} ${c.number})`, valor: `${fmtPct(c.pct, 2)} · vence em ${fmtInt(wins.get(c.id) ?? 0)}`, pessoa: { nome: titleCase(c.name), foto: c.photo, cor: slotColor(palette, c.color) } })),
+          cor: slotColor(palette, chosen[0]?.color ?? -1),
           colunas: [{ titulo: route.uf || route.det ? 'Município' : 'Estado' }, ...chosen.map((c) => ({ titulo: `${titleCase(c.name)} (%)`, tipo: 'pct' as const })), { titulo: 'Vencedor' }],
           linhas: sorted.map((a) => [a.name, ...ids.map((id) => a.pct[id]), titleCase(cands.get(a.winner)?.name ?? '')]),
         })} />}>
